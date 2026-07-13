@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>우리 팀 프로젝트</title>
+</head>
+<body>
+    <h1>우리 팀 프로젝트 홈페이지 오픈!</h1>
+</body>
+</html>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  // 1. 내 Supabase 정보 입력 (수업용 URL과 ANON KEY를 넣어주세요)
+  const SUPABASE_URL = 'https://여기에_내_슈파베이스_주소.supabase.co';
+  const SUPABASE_KEY = '여기에_내_슈파베이스_아논키'; 
+  const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  // 2. 선생님께 받은 OpenAI API 키
+
+
+  // 3. AI에게 질문을 보내고 결과를 받아오는 함수 예시
+  async function askAI(prompt) {
+      try {
+          const response = await fetch('https://api.openai.com/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${OPENAI_API_KEY}`
+              },
+              body: JSON.stringify({
+                  model: 'gpt-4o-mini', // 또는 수업에서 지정해 준 모델
+                  messages: [{ role: 'user', content: prompt }]
+              })
+          });
+          
+          const data = await response.json();
+          console.log("AI 응답:", data.choices[0].message.content);
+          alert("AI 응답: " + data.choices[0].message.content);
+      } catch (error) {
+          console.error("에러 발생:", error);
+      }
+  }
+
+  // 예시: 페이지가 열리자마자 AI에게 자동으로 질문해보기 (테스트용)
+  // askAI("안녕? 반가워!");
+</script>
