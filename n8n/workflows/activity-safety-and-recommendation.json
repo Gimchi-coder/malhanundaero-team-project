@@ -1,0 +1,78 @@
+{
+  "name": "동네 광장 - 안전 검토 및 맞춤 추천",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "dongne-gwangjang/automation",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Webhook 입력",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "dongne-gwangjang-automation"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body ?? $json;\nconst activity = body.activity ?? {};\nconst operation = body.operation;\nif (!['safety_review', 'recommend'].includes(operation)) throw new Error('unsupported operation');\nif (operation === 'safety_review' && (!activity.title || !activity.purpose || !activity.description || !activity.location)) throw new Error('missing activity fields');\nif (operation === 'recommend' && !Array.isArray(body.activities)) throw new Error('missing activities');\nreturn [{ json: { requestId: String(body.requestId || crypto.randomUUID()), operation, activity, activities: body.activities || [], preferences: body.preferences || {}, normalizedText: `${activity.title || ''} ${activity.purpose || ''} ${activity.description || ''}`.normalize('NFKC').toLowerCase().replace(/[\\s_\\-.~!@#$%^&*()[\\]{}:;,'\"`/\\\\|]+/g, '') } }];"
+      },
+      "id": "validate-normalize",
+      "name": "검증 및 정규화",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.SAFETY_CLASSIFIER_URL}}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { requestId: $json.requestId, operation: $json.operation, text: $json.normalizedText, activity: $json.activity, preferences: $json.preferences } }}",
+        "options": { "timeout": 8000 },
+        "continueOnFail": true
+      },
+      "id": "semantic-review",
+      "name": "보호된 의미·의도 분류",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [500, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $('검증 및 정규화').first().json;\nif (input.operation === 'recommend') {\n  const recommendations = Array.isArray($json.recommendations) ? $json.recommendations : [];\n  return [{ json: { requestId: input.requestId, recommendations, message: recommendations.length ? '' : '조건에 맞는 활동이 없습니다.', policyVersion: $json.policyVersion || 'recommendation-v1' } }];\n}\nconst result = $json.error ? { decision: 'manual_review', categories: [], confidence: 'low', explanation: '의미 검토 서비스를 사용할 수 없어 운영자 검토로 전환했습니다.', guidance: '잠시 후 다시 시도하거나 운영자 검토를 요청해 주세요.' } : $json;\nconst decision = result.decision || (result.risk === 'high' ? 'held' : result.confidence === 'low' ? 'manual_review' : 'approved');\nreturn [{ json: { requestId: result.requestId || input.requestId, decision: ['approved', 'held', 'manual_review', 'unavailable'].includes(decision) ? decision : 'manual_review', categories: result.categories || [], confidence: result.confidence || 'low', explanation: result.explanation || '검토 결과를 확인해 주세요.', guidance: result.guidance || '내용을 수정하거나 운영자 검토를 요청해 주세요.', policyVersion: result.policyVersion || 'safety-v1' } }];"
+      },
+      "id": "decision",
+      "name": "보류·게시 분기",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [760, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "response",
+      "name": "계약 응답",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1020, 0]
+    }
+  ],
+  "connections": {
+    "Webhook 입력": { "main": [[{ "node": "검증 및 정규화", "type": "main", "index": 0 }]] },
+    "검증 및 정규화": { "main": [[{ "node": "보호된 의미·의도 분류", "type": "main", "index": 0 }]] },
+    "보호된 의미·의도 분류": { "main": [[{ "node": "보류·게시 분기", "type": "main", "index": 0 }]] },
+    "보류·게시 분기": { "main": [[{ "node": "계약 응답", "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "versionId": "safety-recommendation-v1",
+  "meta": { "templateCredsSetupCompleted": false },
+  "tags": []
+}

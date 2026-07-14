@@ -1,0 +1,12 @@
+{
+  "policyVersion": "safety-v2-local",
+  "activities": [
+    { "id": "seed-walk", "purpose": "퇴근 후 동네 산책과 가벼운 대화", "description": "함께 걷고 캔커피를 마시는 모임" },
+    { "id": "seed-reading", "purpose": "말없이 각자 책을 읽기", "description": "조용히 각자의 시간을 보내는 모임" }
+  ],
+  "recommendations": [
+    { "interest": "산책", "comfort": "active", "expectedActivity": "seed-walk" },
+    { "interest": "독서", "comfort": "quiet", "expectedActivity": "seed-reading" },
+    { "interest": "없는 활동", "comfort": "any", "expectedActivity": null }
+  ]
+}
