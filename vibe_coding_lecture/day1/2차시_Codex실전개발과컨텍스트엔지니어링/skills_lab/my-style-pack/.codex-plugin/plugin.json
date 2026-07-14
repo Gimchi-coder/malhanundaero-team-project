@@ -1,0 +1,6 @@
+{
+  "name": "my-style-pack",
+  "version": "0.1.0",
+  "description": "날씨×분위기 옷차림 추천 — outfit-stylist 스킬",
+  "skills": "./skills/"
+}
