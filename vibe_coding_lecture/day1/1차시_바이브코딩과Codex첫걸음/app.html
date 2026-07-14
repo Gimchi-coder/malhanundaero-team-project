@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>랜덤 점심 메뉴 추천</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            font-family: Arial, sans-serif;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        #menu {
+            margin-top: 20px;
+            font-size: 24px;
+        }
+    </style>
+</head>
+<body>
+    <h1>랜덤 점심 메뉴 추천</h1>
+    <button id="recommendBtn">메뉴 추천</button>
+    <div id="menu"></div>
+
+    <script>
+        const menus = [
+            '비빔밥',
+            '김밥',
+            '떡볶이',
+            '불고기',
+            '제육볶음',
+            '된장찌개',
+            '짬뽕',
+            '참치회',
+            '피자',
+            '치킨',
+            '갈비',
+            '순두부찌개'
+        ];
+
+        document.getElementById('recommendBtn').addEventListener('click', function() {
+            const randomIndex = Math.floor(Math.random() * menus.length);
+            document.getElementById('menu').innerText = menus[randomIndex];
+        });
+    </script>
+</body>
+</html>
