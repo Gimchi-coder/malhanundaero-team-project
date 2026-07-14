@@ -2,7 +2,7 @@
     --ink: #17202b;
     --muted: #6c7887;
     --muted-light: #9aa5b3;
-    --paper: #f7f8fa;
+    --paper: #eef5ff;
     --surface: #ffffff;
     --line: #e6eaf0;
     --accent: #ef9368;
@@ -32,7 +32,7 @@ button { border: 0; cursor: pointer; }
 button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible { outline: 3px solid rgba(77,143,216,.45); outline-offset: 3px; }
 .hidden { display: none !important; }
 
-.navbar { position: sticky; top: 0; z-index: 1000; display: flex; align-items: center; justify-content: space-between; gap: 24px; min-height: 76px; padding: 0 max(24px, calc((100% - 1240px) / 2)); border-bottom: 1px solid rgba(230,234,240,.86); background: rgba(247,248,250,.88); backdrop-filter: blur(18px); }
+.navbar { position: sticky; top: 0; z-index: 1000; display: flex; align-items: center; justify-content: space-between; gap: 24px; min-height: 76px; padding: 0 max(24px, calc((100% - 1240px) / 2)); border-bottom: 1px solid rgba(230,234,240,.86); background: rgba(238,245,255,.88); backdrop-filter: blur(18px); }
 .brand { display: inline-flex; align-items: center; gap: 10px; min-width: max-content; }
 .brand-mark { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 12px; color: #fff; background: var(--accent); font-weight: 800; box-shadow: 0 7px 15px rgba(239,147,104,.25); }
 .brand strong { display: block; font-size: 1rem; letter-spacing: -.04em; }
