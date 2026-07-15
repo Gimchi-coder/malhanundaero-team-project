@@ -224,6 +224,8 @@ function safetyPrompt(activity) {
         '표면 단어만 보지 말고 문맥, 실제 의도, 완곡어법, 초성·자모·띄어쓰기 우회, 은어를 함께 판단한다.',
         '담배·주류·약물 구매/대리구매, 불법·위험 행위, 사기·투자·금전 모집, 성적 만남·조건만남·데이트, 괴롭힘·혐오·협박, 개인정보 수집·거래, 앱 취지와 무관한 모집은 승인하지 않는다.',
         '예방 교육·뉴스·상담·비판적 언급처럼 실제 행위 모집이 아닌 맥락은 구분한다.',
+        '자전거, 산책, 독서, 바다 구경, 영화, 운동처럼 일반적인 여가 활동은 위험 신호가 없고 목적·장소·일정이 구체적이면 approved로 판단한다.',
+        '위험 신호가 없는 정상 활동을 단순히 야외 활동이거나 낯선 사람과 만난다는 이유로 보류하지 않는다.',
         '애매하거나 정보가 부족하면 approved가 아니라 manual_review를 선택한다.',
         'categories는 dating, sales, scam, investment, proselytizing, harassment, risky_goods, recruitment, privacy, context_unclear 중에서만 고른다. approved이면 categories는 빈 배열이다.',
         'JSON 하나만 반환한다. 키는 decision(approved|held|manual_review), categories(string[]), confidence(high|medium|low), explanation(string), guidance(string)이다.',
@@ -270,7 +272,7 @@ function sanitizeSafetyResult(value, requestId) {
 
 function finalizeSafetyResult(result, requestId) {
     const normalized = sanitizeSafetyResult(result, requestId);
-    if (normalized.decision === 'approved' && normalized.confidence !== 'high') {
+    if (normalized.decision === 'approved' && normalized.confidence === 'low') {
         return Object.assign({}, normalized, { decision: 'manual_review', explanation: '안전하다고 단정하기 어려워 운영자 검토로 전환했습니다.' });
     }
     return normalized;
