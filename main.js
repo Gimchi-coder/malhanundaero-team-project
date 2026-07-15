@@ -32,6 +32,18 @@ const state = {
 const privateGroupState = new Map();
 
 const $ = (id) => document.getElementById(id);
+const supabaseClient = (() => {
+    if (!window.supabase?.createClient || !CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_PUBLISHABLE_KEY) return null;
+    try {
+        return window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_PUBLISHABLE_KEY, {
+            auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+        });
+    } catch (error) {
+        console.error('Supabase client initialization failed', error);
+        return null;
+    }
+})();
+const supabaseState = { active: Boolean(supabaseClient), hydrated: false };
 const elements = {
     login: $('btn-login'),
     signup: $('btn-signup'),
@@ -103,10 +115,23 @@ elements.enterActivities = $('btn-enter-activities');
 elements.recommendationDock = $('ai-recommendation');
 elements.viewTabs = [...document.querySelectorAll('[data-view-target]')];
 elements.navCreate = $('nav-create');
-const signupState = { idAvailable: false, idCheckedId: '', verificationComplete: false };
+const signupState = {
+    idAvailable: false,
+    idCheckedId: '',
+    verificationComplete: false,
+    verificationContact: '',
+    verificationMethod: '',
+    isSubmitting: false
+};
 
 const safeJson = (value, fallback) => {
-    try { return JSON.parse(value); } catch { return fallback; }
+    if (value === null || value === undefined || value === '') return fallback;
+    try {
+        const parsed = JSON.parse(value);
+        return parsed ?? fallback;
+    } catch {
+        return fallback;
+    }
 };
 
 function publicUser(user) {
@@ -125,6 +150,109 @@ function normalizeNickname(nickname) {
 
 function normalizeLoginId(loginId) {
     return String(loginId || '').normalize('NFKC').trim().toLowerCase();
+}
+
+function authEmailForLoginId(loginId) {
+    const domain = String(CONFIG.SUPABASE_AUTH_EMAIL_DOMAIN || 'auth.dongne-gwangjang.local').replace(/^@+/, '');
+    return `${normalizeLoginId(loginId)}@${domain}`;
+}
+
+function supabaseErrorMessage(error, fallback = 'Supabase 연결을 확인해 주세요.') {
+    const code = String(error?.code || '');
+    const message = String(error?.message || '');
+    if (/email.*confirm|confirm.*email|email_not_confirmed/i.test(`${code} ${message}`)) return 'Supabase에서 이메일 확인이 켜져 있어요. Authentication 설정에서 Confirm email을 끄거나 이메일 인증 흐름을 먼저 완료해 주세요.';
+    if (/invalid.*login|invalid.*credential|user.*not.*found/i.test(`${code} ${message}`)) return '아이디 또는 비밀번호가 올바르지 않습니다.';
+    if (/relation .* does not exist|schema cache|profiles|activities/i.test(message)) return 'Supabase 테이블이 아직 준비되지 않았습니다. supabase/schema.sql을 SQL Editor에서 먼저 실행해 주세요.';
+    return fallback;
+}
+
+async function remoteLoginIdAvailable(loginId) {
+    if (!supabaseClient) return true;
+    const { data, error } = await supabaseClient.rpc('login_id_available', { p_login_id: loginId });
+    if (error) throw error;
+    return data === true;
+}
+
+async function remoteProfileForUser(userId) {
+    if (!supabaseClient || !userId) return null;
+    const { data, error } = await supabaseClient.from('profiles')
+        .select('id,login_id,nickname,name,gender,age,phone,age_group,verification_method,marketing_consent,trust_score')
+        .eq('id', userId)
+        .maybeSingle();
+    if (error) throw error;
+    return data;
+}
+
+function persistRemoteProfileLocally(profile) {
+    if (!profile) return;
+    localStorage.setItem(PRIVATE_PROFILE_KEY, JSON.stringify({
+        userId: profile.id,
+        name: profile.name,
+        gender: profile.gender,
+        age: Number(profile.age),
+        ageGroup: profile.age_group,
+        phone: profile.phone,
+        signupId: profile.login_id,
+        verificationMethod: profile.verification_method,
+        marketingConsent: Boolean(profile.marketing_consent)
+    }));
+    const trust = safeJson(localStorage.getItem(TRUST_KEY), {});
+    trust[String(profile.id)] = normalizedTrustScore(profile.trust_score);
+    localStorage.setItem(TRUST_KEY, JSON.stringify(trust));
+}
+
+function applyRemoteProfile(profile) {
+    if (!profile?.id || !profile.nickname) return false;
+    persistRemoteProfileLocally(profile);
+    state.user = publicUser({ id: profile.id, nickname: profile.nickname, icon: '🌱', trustScore: profile.trust_score });
+    localStorage.setItem(USER_KEY, JSON.stringify(state.user));
+    state.filters.ageGroup = profile.age_group || 'all';
+    return true;
+}
+
+async function registerRemoteAccount(draft) {
+    if (!supabaseClient) return null;
+    const { data, error } = await supabaseClient.auth.signUp({
+        email: authEmailForLoginId(draft.loginId),
+        password: draft.password,
+        options: { data: { login_id: draft.loginId } }
+    });
+    if (error) throw error;
+    if (!data.user || !data.session) throw new Error('email_confirmation_required');
+    const profile = {
+        id: data.user.id,
+        login_id: draft.loginId,
+        nickname: null,
+        name: draft.name,
+        gender: draft.gender,
+        age: draft.age,
+        phone: draft.phone,
+        age_group: ageGroupFromAge(draft.age),
+        verification_method: draft.verificationMethod,
+        marketing_consent: draft.marketingConsent,
+        trust_score: TRUST_BASELINE
+    };
+    const { error: profileError } = await supabaseClient.from('profiles').insert(profile);
+    if (profileError) {
+        await supabaseClient.auth.signOut();
+        throw profileError;
+    }
+    return data.user;
+}
+
+async function updateRemoteNickname(userId, nickname) {
+    if (!supabaseClient || !userId) return;
+    const { error } = await supabaseClient.from('profiles').update({ nickname, updated_at: new Date().toISOString() }).eq('id', userId);
+    if (error) throw error;
+}
+
+async function signInRemote(loginId, password) {
+    if (!supabaseClient) return null;
+    const { data, error } = await supabaseClient.auth.signInWithPassword({ email: authEmailForLoginId(loginId), password });
+    if (error) throw error;
+    const profile = await remoteProfileForUser(data.user.id);
+    if (!profile?.nickname) throw new Error('nickname_missing');
+    return profile;
 }
 
 async function hashSecret(secret) {
@@ -334,6 +462,81 @@ const persistence = {
         window.dispatchEvent(new CustomEvent('dg:groups-changed'));
     }
 };
+
+function remoteActivityFromRow(row) {
+    return {
+        id: row.id,
+        title: row.title,
+        purpose: row.purpose,
+        description: row.description,
+        location: row.location,
+        scheduledAt: row.scheduled_at,
+        status: row.status,
+        participants: Number(row.participant_count || 1),
+        maxParticipants: Number(row.max_participants),
+        ageGroup: row.age_group,
+        category: row.category,
+        categoryFamily: row.category_family,
+        creatorId: row.creator_id,
+        hostTrustScore: Number(row.host_trust_score),
+        participantIds: [],
+        remote: true,
+        updatedAt: row.updated_at
+    };
+}
+
+async function loadRemoteActivities() {
+    if (!supabaseClient) return;
+    const { data, error } = await supabaseClient.from('activities')
+        .select('id,creator_id,host_nickname,host_trust_score,title,purpose,description,location,scheduled_at,category,category_family,age_group,participant_count,max_participants,status,updated_at')
+        .order('scheduled_at', { ascending: true });
+    if (error) throw error;
+    const remoteGroups = (data || []).map(remoteActivityFromRow);
+    const byId = new Map(remoteGroups.map((group) => [group.id, group]));
+    state.groups = state.groups.map((group) => byId.get(group.id) || group);
+    const localIds = new Set(state.groups.map((group) => group.id));
+    remoteGroups.filter((group) => !localIds.has(group.id)).forEach((group) => state.groups.push(group));
+    state.groups = state.groups.map(ensureGroupMetadata);
+    persistence.save();
+    renderGroups();
+}
+
+async function loadRemoteMemberships() {
+    if (!supabaseClient) return;
+    const { data, error } = await supabaseClient.from('activity_participants').select('activity_id').eq('status', 'confirmed');
+    if (error) throw error;
+    (data || []).forEach((row) => state.joinedGroupIds.add(row.activity_id));
+    renderGroups();
+}
+
+async function persistRemoteActivity(activity) {
+    if (!supabaseClient) return;
+    const row = {
+        id: activity.id,
+        creator_id: activity.creatorId,
+        host_nickname: state.user.nickname,
+        host_trust_score: activity.hostTrustScore,
+        title: activity.title,
+        purpose: activity.purpose,
+        description: activity.description,
+        location: activity.location,
+        scheduled_at: activity.scheduledAt,
+        category: activity.category,
+        category_family: activity.categoryFamily,
+        age_group: activity.ageGroup,
+        participant_count: 1,
+        max_participants: activity.maxParticipants,
+        status: 'pending'
+    };
+    const { error: insertError } = await supabaseClient.from('activities').insert(row);
+    if (insertError) throw insertError;
+    const { error: publishError } = await supabaseClient.from('activities')
+        .update({ status: 'recruiting', updated_at: new Date().toISOString() })
+        .eq('id', activity.id)
+        .eq('creator_id', activity.creatorId);
+    if (publishError) throw publishError;
+    activity.remote = true;
+}
 
 function loadPosts() {
     const stored = safeJson(localStorage.getItem(POSTS_KEY), null);
@@ -680,6 +883,7 @@ function dismissNotification(notificationId) {
     state.notifications = state.notifications.filter((item) => item.id !== notificationId);
     saveNotifications();
     renderNotifications();
+    setStatus('알림을 확인 처리했습니다.', 'success');
 }
 
 function openNotifications() {
@@ -833,20 +1037,31 @@ function openSignup() {
     $('signup-name').focus();
 }
 
-function closeSignup() {
-    elements.signupModal.classList.add('hidden');
-    elements.signupForm.reset();
+function resetSignupState() {
     signupState.idAvailable = false;
     signupState.idCheckedId = '';
     signupState.verificationComplete = false;
-    $('signup-id').dataset.checkedId = '';
-    $('signup-id').dataset.idAvailable = '';
+    signupState.verificationContact = '';
+    signupState.verificationMethod = '';
+    signupState.isSubmitting = false;
+    const idInput = $('signup-id');
+    if (idInput) {
+        idInput.dataset.checkedId = '';
+        idInput.dataset.idAvailable = '';
+    }
+}
+
+function closeSignup() {
+    elements.signupModal.classList.add('hidden');
+    elements.signupForm.reset();
+    resetSignupState();
     $('signup-id-status').textContent = '';
     elements.signupSubmitStatus.textContent = '';
     elements.signupSubmitStatus.dataset.tone = '';
     $('signup-age-status').textContent = '만 20세 이상만 가입할 수 있어요.';
     $('signup-age-status').dataset.tone = '';
     $('signup-verification-status').textContent = '개발용 인증 흐름입니다.';
+    $('signup-verification-status').dataset.tone = '';
 }
 
 function openNicknameSetup() {
@@ -868,7 +1083,7 @@ function closeProfile() {
     if (elements.profileStatus) { elements.profileStatus.textContent = ''; elements.profileStatus.dataset.tone = ''; }
 }
 
-function submitProfile(event) {
+async function submitProfile(event) {
     event.preventDefault();
     if (!state.user) return closeProfile();
     const nickname = elements.profileNickname.value.trim();
@@ -876,6 +1091,13 @@ function submitProfile(event) {
     if (!/^[\p{L}\p{N} _-]+$/u.test(nickname)) return setProfileStatus('닉네임에는 한글, 영문, 숫자와 기본 기호만 사용할 수 있습니다.', 'warning', 'input-profile-nickname');
     const duplicate = getAccounts().some((account) => account.id !== state.user.id && normalizeNickname(account.nickname) === normalizeNickname(nickname));
     if (duplicate) return setProfileStatus('이미 사용 중인 닉네임입니다. 다른 닉네임을 입력해 주세요.', 'warning', 'input-profile-nickname');
+    if (supabaseClient) {
+        try {
+            await updateRemoteNickname(state.user.id, nickname);
+        } catch (error) {
+            return setProfileStatus(supabaseErrorMessage(error, 'Supabase에 닉네임을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.'), 'warning', 'input-profile-nickname');
+        }
+    }
     state.user = publicUser({ ...state.user, nickname });
     upsertAccount({ id: state.user.id, nickname, trustScore: state.user.trustScore });
     localStorage.setItem(USER_KEY, JSON.stringify(state.user));
@@ -884,28 +1106,45 @@ function submitProfile(event) {
     setStatus('닉네임이 변경되었습니다.', 'success');
 }
 
-function submitNicknameSetup(event) {
+async function submitNicknameSetup(event) {
     event.preventDefault();
     const nickname = $('input-signup-nickname').value.trim();
     if (nickname.length < 2 || nickname.length > 24) return setNicknameStatus('닉네임은 2~24자로 입력해 주세요.', 'warning', 'input-signup-nickname');
     if (!/^[\p{L}\p{N} _-]+$/u.test(nickname)) return setNicknameStatus('닉네임에는 한글, 영문, 숫자와 기본 기호만 사용할 수 있습니다.', 'warning', 'input-signup-nickname');
-    const accountId = state.pendingSignupId || crypto.randomUUID?.() || String(Date.now());
-    if (getAccounts().some((account) => normalizeNickname(account.nickname) === normalizeNickname(nickname))) return setNicknameStatus('이미 사용 중인 닉네임입니다. 다른 닉네임을 입력해 주세요.', 'warning', 'input-signup-nickname');
-    state.user = publicUser({ id: accountId, nickname, icon: '🌱', trustScore: TRUST_BASELINE });
-    upsertAccount({ id: accountId, nickname, trustScore: TRUST_BASELINE });
-    state.pendingSignupId = null;
-    localStorage.setItem(USER_KEY, JSON.stringify(state.user));
-    elements.nicknameSetupModal.classList.add('hidden');
-    elements.nicknameSetupForm.reset();
-    state.filters.ageGroup = 'mine';
-    updateNav();
-    setView('activities', false);
-    setStatus('회원가입과 공개 닉네임 설정이 완료되어 자동 로그인되었습니다. 그룹 활동을 시작해 보세요.', 'success');
+    if (!state.pendingSignupId) return setNicknameStatus('가입 정보가 만료되었습니다. 회원가입을 다시 진행해 주세요.', 'warning', 'input-signup-nickname');
+    if (getAccounts().some((account) => String(account.id) !== String(state.pendingSignupId) && normalizeNickname(account.nickname) === normalizeNickname(nickname))) {
+        return setNicknameStatus('이미 사용 중인 닉네임입니다. 다른 닉네임을 입력해 주세요.', 'warning', 'input-signup-nickname');
+    }
+
+    try {
+        const account = getAccounts().find((item) => String(item.id) === String(state.pendingSignupId));
+        if (!account) return setNicknameStatus('가입 정보를 찾을 수 없습니다. 회원가입을 다시 진행해 주세요.', 'warning', 'input-signup-nickname');
+        if (supabaseClient) {
+            try {
+                await updateRemoteNickname(state.pendingSignupId, nickname);
+            } catch (error) {
+                return setNicknameStatus(supabaseErrorMessage(error, 'Supabase에 닉네임을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.'), 'warning', 'input-signup-nickname');
+            }
+        }
+        state.user = publicUser({ id: account.id, nickname, icon: '🌱', trustScore: account.trustScore });
+        upsertAccount({ id: account.id, nickname, trustScore: state.user.trustScore });
+        localStorage.setItem(USER_KEY, JSON.stringify(state.user));
+        state.pendingSignupId = null;
+        elements.nicknameSetupModal.classList.add('hidden');
+        elements.nicknameSetupForm.reset();
+        state.filters.ageGroup = 'mine';
+        updateNav();
+        setView('activities', false);
+        setStatus('회원가입과 공개 닉네임 설정이 완료되어 자동 로그인되었습니다. 그룹 활동을 시작해 보세요.', 'success');
+    } catch (error) {
+        console.error(error);
+        setNicknameStatus('닉네임을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.', 'warning', 'input-signup-nickname');
+    }
 }
 
-function checkSignupId() {
+async function checkSignupId() {
     const input = $('signup-id');
-    const id = input.value.trim().toLowerCase();
+    const id = normalizeLoginId(input.value);
     const status = $('signup-id-status');
     if (!/^[a-z0-9][a-z0-9_-]{3,23}$/.test(id)) {
         signupState.idAvailable = false;
@@ -919,16 +1158,47 @@ function checkSignupId() {
     const usedIds = safeJson(localStorage.getItem('dg_signup_ids_v1'), []);
     const usedId = Array.isArray(usedIds) && usedIds.some((usedIdValue) => normalizeLoginId(usedIdValue) === id);
     const accountIdUsed = getAccounts().some((account) => normalizeLoginId(account.loginId) === id);
-    signupState.idAvailable = !usedId && !accountIdUsed;
     signupState.idCheckedId = id;
+    if (usedId || accountIdUsed) {
+        signupState.idAvailable = false;
+        input.dataset.checkedId = id;
+        input.dataset.idAvailable = 'false';
+        status.textContent = '이미 사용 중인 아이디입니다.';
+        status.dataset.tone = 'warning';
+        return false;
+    }
+    if (supabaseClient) {
+        status.textContent = 'Supabase에서 아이디 중복 여부를 확인하고 있어요...';
+        status.dataset.tone = 'info';
+        try {
+            if (!await remoteLoginIdAvailable(id)) {
+                signupState.idAvailable = false;
+                input.dataset.checkedId = id;
+                input.dataset.idAvailable = 'false';
+                status.textContent = '이미 사용 중인 아이디입니다.';
+                status.dataset.tone = 'warning';
+                return false;
+            }
+        } catch (error) {
+            signupState.idAvailable = false;
+            input.dataset.checkedId = '';
+            input.dataset.idAvailable = 'false';
+            status.textContent = supabaseErrorMessage(error, '아이디 중복 확인에 실패했습니다. Supabase 설정을 확인해 주세요.');
+            status.dataset.tone = 'warning';
+            return false;
+        }
+    }
+    signupState.idAvailable = true;
     input.dataset.checkedId = id;
-    input.dataset.idAvailable = String(signupState.idAvailable);
-    status.textContent = signupState.idAvailable ? '사용 가능한 아이디입니다.' : '이미 사용 중인 아이디입니다.';
-    status.dataset.tone = signupState.idAvailable ? 'success' : 'warning';
+    input.dataset.idAvailable = 'true';
+    status.textContent = supabaseClient ? 'Supabase 확인 완료 · 사용 가능한 아이디입니다.' : '사용 가능한 아이디입니다.';
+    status.dataset.tone = 'success';
+    return signupState.idAvailable;
 }
 
 function sendSignupVerification() {
-    const contact = $('signup-verification-contact').value.trim();
+    const contact = $('signup-verification-contact').value.normalize('NFKC').trim();
+    const method = $('signup-verification-method').value;
     if (!contact) {
         $('signup-verification-status').textContent = '인증 연락처를 입력해 주세요.';
         $('signup-verification-status').dataset.tone = 'warning';
@@ -936,12 +1206,20 @@ function sendSignupVerification() {
         return false;
     }
     signupState.verificationComplete = true;
-    $('signup-verification-status').textContent = '본인인증이 완료되었습니다. (개발용)';
+    signupState.verificationContact = contact;
+    signupState.verificationMethod = method;
+    $('signup-verification-status').textContent = `${method === 'phone' ? '휴대폰' : '이메일'} 본인인증이 완료되었습니다. (개발용)`;
     $('signup-verification-status').dataset.tone = 'success';
+    return true;
 }
 
 function resetSignupVerification() {
+    const contact = $('signup-verification-contact').value.normalize('NFKC').trim();
+    const method = $('signup-verification-method').value;
+    if (signupState.verificationComplete && contact === signupState.verificationContact && method === signupState.verificationMethod) return;
     signupState.verificationComplete = false;
+    signupState.verificationContact = '';
+    signupState.verificationMethod = '';
     $('signup-verification-status').textContent = '인증 연락처가 변경되었습니다. 다시 인증해 주세요.';
     $('signup-verification-status').dataset.tone = 'info';
 }
@@ -970,72 +1248,113 @@ function completeSignupVerification() {
         return;
     }
     if (!code) {
-        $('signup-verification-status').textContent = '개발용 인증은 이미 완료되었습니다. 인증번호 입력은 선택 사항입니다.';
+        $('signup-verification-status').textContent = '본인인증이 완료되었습니다. 인증번호 입력은 선택 사항입니다. (개발용)';
         $('signup-verification-status').dataset.tone = 'success';
-        return;
+        return true;
     }
-    if (!/^\d{4,6}$/.test(code)) {
-        $('signup-verification-status').textContent = '인증번호가 올바르지 않습니다.';
+    if (code !== '123456') {
+        $('signup-verification-status').textContent = '개발용 인증번호는 123456을 입력해 주세요.';
         $('signup-verification-status').dataset.tone = 'info';
-        return;
+        return false;
     }
-    $('signup-verification-status').textContent = code === '123456'
-        ? '본인인증이 완료되었습니다. (개발용)'
-        : '인증하기 단계가 완료되어 회원가입을 계속할 수 있습니다. (개발용)';
+    $('signup-verification-status').textContent = '본인인증이 완료되었습니다. (개발용)';
     $('signup-verification-status').dataset.tone = 'success';
+    return true;
 }
 
 async function submitSignup(event) {
     event.preventDefault();
+    if (signupState.isSubmitting) return false;
+    const idInput = $('signup-id');
+    const draft = {
+        name: $('signup-name').value.normalize('NFKC').trim(),
+        gender: $('signup-gender').value,
+        age: Number($('signup-age').value),
+        phone: $('signup-phone').value.normalize('NFKC').trim(),
+        loginId: normalizeLoginId(idInput.value),
+        password: $('signup-password').value,
+        passwordConfirm: $('signup-password-confirm').value,
+        verificationContact: $('signup-verification-contact').value.normalize('NFKC').trim(),
+        verificationMethod: $('signup-verification-method').value,
+        marketingConsent: $('signup-marketing-consent').checked,
+        privacyConsent: $('signup-privacy-consent').checked
+    };
+
     const requiredFields = [
-        ['signup-name', '이름'], ['signup-gender', '성별'], ['signup-age', '나이'], ['signup-phone', '휴대폰 번호'],
-        ['signup-id', '아이디'], ['signup-password', '비밀번호'], ['signup-password-confirm', '비밀번호 확인'], ['signup-verification-contact', '인증 연락처']
+        ['name', '이름', 'signup-name'], ['gender', '성별', 'signup-gender'], ['age', '나이', 'signup-age'],
+        ['phone', '휴대폰 번호', 'signup-phone'], ['loginId', '아이디', 'signup-id'], ['password', '비밀번호', 'signup-password'],
+        ['passwordConfirm', '비밀번호 확인', 'signup-password-confirm'], ['verificationContact', '인증 연락처', 'signup-verification-contact']
     ];
-    for (const [fieldId, label] of requiredFields) {
-        if (!$(`${fieldId}`).value.trim()) return setSignupStatus(`${label}을(를) 입력해 주세요.`, 'warning', fieldId);
+    for (const [field, label, focusId] of requiredFields) {
+        if (!String(draft[field] ?? '').trim()) return setSignupStatus(`${label}을(를) 입력해 주세요.`, 'warning', focusId);
     }
-    if (!$('signup-privacy-consent').checked) return setSignupStatus('개인정보 수집·이용 동의가 필요합니다.', 'warning', 'signup-privacy-consent');
-    const age = Number($('signup-age').value);
-    if (!Number.isInteger(age) || age < 20 || age > 100) {
+    if (!draft.privacyConsent) return setSignupStatus('개인정보 수집·이용 동의가 필요합니다.', 'warning', 'signup-privacy-consent');
+    if (!['male', 'female'].includes(draft.gender)) return setSignupStatus('성별을 선택해 주세요.', 'warning', 'signup-gender');
+    if (!Number.isInteger(draft.age) || draft.age < 20 || draft.age > 100) {
         $('signup-age-status').textContent = '20세 미만은 가입할 수 없습니다.';
         $('signup-age-status').dataset.tone = 'warning';
         return setSignupStatus('만 20세 이상만 가입할 수 있습니다.', 'warning', 'signup-age');
     }
-    const password = $('signup-password').value;
-    const idInput = $('signup-id');
-    const id = idInput.value.trim().toLowerCase();
-    if (password.length < 8) return setSignupStatus('비밀번호는 8자 이상 입력해 주세요.', 'warning', 'signup-password');
-    if (idInput.dataset.checkedId !== id) return setSignupStatus('현재 아이디의 중복 확인을 먼저 완료해 주세요.', 'warning', 'signup-id');
-    if (idInput.dataset.idAvailable !== 'true') return setSignupStatus('사용할 수 없는 아이디입니다. 다른 아이디를 입력해 주세요.', 'warning', 'signup-id');
-    const usedIds = safeJson(localStorage.getItem('dg_signup_ids_v1'), []);
-    const usedId = Array.isArray(usedIds) && usedIds.some((usedIdValue) => normalizeLoginId(usedIdValue) === id);
-    const accountIdUsed = getAccounts().some((account) => normalizeLoginId(account.loginId) === id);
-    if (usedId || accountIdUsed) return setSignupStatus('이미 사용 중인 아이디입니다. 다른 아이디를 입력해 주세요.', 'warning', 'signup-id');
-    if (password !== $('signup-password-confirm').value) return setSignupStatus('비밀번호와 확인값이 서로 일치하지 않습니다.', 'warning', 'signup-password-confirm');
-    if (!signupState.verificationComplete) return setSignupStatus('인증하기와 인증 확인을 완료해 주세요.', 'warning', 'signup-verification-code');
-    let passwordHash;
-    try {
-        passwordHash = await hashSecret(password);
-    } catch {
-        return setSignupStatus('비밀번호를 안전하게 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+    if (draft.phone.replace(/\D/g, '').length < 8) return setSignupStatus('휴대폰 번호를 올바르게 입력해 주세요.', 'warning', 'signup-phone');
+    if (!/^[a-z0-9][a-z0-9_-]{3,23}$/.test(draft.loginId)) return setSignupStatus('아이디는 영문·숫자·_- 조합 4~24자로 입력해 주세요.', 'warning', 'signup-id');
+    if (draft.password.length < 8) return setSignupStatus('비밀번호는 8자 이상 입력해 주세요.', 'warning', 'signup-password');
+    if (draft.password !== draft.passwordConfirm) return setSignupStatus('비밀번호와 확인값이 서로 일치하지 않습니다.', 'warning', 'signup-password-confirm');
+    if (idInput.dataset.checkedId !== draft.loginId || idInput.dataset.idAvailable !== 'true') {
+        return setSignupStatus('아이디 입력 후 중복 확인을 완료해 주세요.', 'warning', 'signup-id');
     }
-    localStorage.setItem('dg_signup_ids_v1', JSON.stringify([...new Set([...usedIds, id.toLowerCase()])]));
-    state.pendingSignupId = crypto.randomUUID?.() || String(Date.now());
-    upsertAccount({ id: state.pendingSignupId, loginId: id, passwordHash, nickname: '', trustScore: TRUST_BASELINE });
-    localStorage.setItem(PRIVATE_PROFILE_KEY, JSON.stringify({
-        userId: state.pendingSignupId,
-        name: $('signup-name').value.trim(),
-        gender: $('signup-gender').value,
-        age: Number($('signup-age').value),
-        ageGroup: ageGroupFromAge($('signup-age').value),
-        phone: $('signup-phone').value.trim(),
-        signupId: id,
-        verificationMethod: $('signup-verification-method').value,
-        marketingConsent: $('signup-marketing-consent').checked
-    }));
-    closeSignup();
-    openNicknameSetup();
-    setStatus('회원가입이 완료되었습니다. 공개 닉네임을 설정해 주세요.', 'success');
+    if (!signupState.verificationComplete || signupState.verificationContact !== draft.verificationContact || signupState.verificationMethod !== draft.verificationMethod) {
+        return setSignupStatus('인증하기와 인증 확인을 완료해 주세요.', 'warning', 'signup-verification-code');
+    }
+
+    const usedIds = safeJson(localStorage.getItem('dg_signup_ids_v1'), []);
+    const accounts = getAccounts();
+    const duplicateId = usedIds.some((usedIdValue) => normalizeLoginId(usedIdValue) === draft.loginId)
+        || accounts.some((account) => normalizeLoginId(account.loginId) === draft.loginId);
+    if (duplicateId) {
+        idInput.dataset.idAvailable = 'false';
+        signupState.idAvailable = false;
+        return setSignupStatus('이미 사용 중인 아이디입니다. 다른 아이디를 입력해 주세요.', 'warning', 'signup-id');
+    }
+
+    const submitButton = elements.signupForm.querySelector('button[type="submit"]');
+    signupState.isSubmitting = true;
+    if (submitButton) { submitButton.disabled = true; submitButton.setAttribute('aria-busy', 'true'); }
+    try {
+        const remoteUser = supabaseClient ? await registerRemoteAccount(draft) : null;
+        const passwordHash = supabaseClient ? '' : await hashSecret(draft.password);
+        const accountId = remoteUser?.id || window.crypto?.randomUUID?.() || `user-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const account = { id: accountId, loginId: draft.loginId, passwordHash, nickname: '', trustScore: TRUST_BASELINE };
+        const privateProfile = {
+            userId: accountId, name: draft.name, gender: draft.gender, age: draft.age,
+            ageGroup: ageGroupFromAge(draft.age), phone: draft.phone, signupId: draft.loginId,
+            verificationMethod: draft.verificationMethod, marketingConsent: draft.marketingConsent
+        };
+        const previous = {
+            accounts: localStorage.getItem(ACCOUNTS_KEY), ids: localStorage.getItem('dg_signup_ids_v1'),
+            profile: localStorage.getItem(PRIVATE_PROFILE_KEY)
+        };
+        try {
+            saveAccounts([...accounts, account]);
+            localStorage.setItem('dg_signup_ids_v1', JSON.stringify([...new Set([...usedIds, draft.loginId])]));
+            localStorage.setItem(PRIVATE_PROFILE_KEY, JSON.stringify(privateProfile));
+        } catch (storageError) {
+            if (previous.accounts === null) localStorage.removeItem(ACCOUNTS_KEY); else localStorage.setItem(ACCOUNTS_KEY, previous.accounts);
+            if (previous.ids === null) localStorage.removeItem('dg_signup_ids_v1'); else localStorage.setItem('dg_signup_ids_v1', previous.ids);
+            if (previous.profile === null) localStorage.removeItem(PRIVATE_PROFILE_KEY); else localStorage.setItem(PRIVATE_PROFILE_KEY, previous.profile);
+            throw storageError;
+        }
+        state.pendingSignupId = accountId;
+        closeSignup();
+        openNicknameSetup();
+        setStatus('회원가입이 완료되었습니다. 공개 닉네임을 설정해 주세요.', 'success');
+        return true;
+    } catch (error) {
+        console.error(error);
+        return setSignupStatus('회원가입 정보를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.', 'warning');
+    } finally {
+        signupState.isSubmitting = false;
+        if (submitButton) { submitButton.disabled = false; submitButton.removeAttribute('aria-busy'); }
+    }
 }
 
 async function login(event) {
@@ -1046,6 +1365,19 @@ async function login(event) {
     if (!password) return setLoginStatus('비밀번호를 입력해 주세요.', 'warning', 'input-login-password');
     if (!$('login-consent').checked) return setLoginStatus('커뮤니티 안전 규칙과 개인정보 최소 이용 안내를 확인해 주세요.', 'warning', 'login-consent');
     const account = getAccounts().find((item) => normalizeLoginId(item.loginId) === loginId);
+    if (supabaseClient) {
+        try {
+            const profile = await signInRemote(loginId, password);
+            applyRemoteProfile(profile);
+            closeLogin(); updateNav();
+            setView('activities', false);
+            setStatus('Supabase 로그인에 성공했습니다. 참여할 활동을 찾아보세요.', 'success');
+            return true;
+        } catch (error) {
+            // Supabase 연결 장애 때만 기존 브라우저 계정으로 제한적인 데모 fallback을 허용합니다.
+            if (!account?.passwordHash) return setLoginStatus(error?.message === 'nickname_missing' ? '회원가입 후 공개 닉네임 설정을 완료해 주세요.' : supabaseErrorMessage(error, 'Supabase 로그인에 실패했습니다.'), 'warning', 'input-login-id');
+        }
+    }
     if (!account) return setLoginStatus('가입된 아이디를 찾을 수 없습니다. 먼저 회원가입을 완료해 주세요.', 'warning', 'input-login-id');
     if (!account.nickname) return setLoginStatus('회원가입 후 공개 닉네임 설정을 완료해 주세요.', 'warning', 'input-login-id');
     let passwordHash;
@@ -1063,12 +1395,37 @@ async function login(event) {
     setStatus('닉네임으로 로그인되었습니다. 참여할 활동을 찾아보세요.', 'success');
 }
 
-function logout() {
+async function logout() {
     closeProfile();
+    if (supabaseClient) {
+        try { await supabaseClient.auth.signOut(); } catch (error) { console.error('Supabase sign-out failed', error); }
+    }
     localStorage.removeItem(USER_KEY);
     localStorage.removeItem(PRIVATE_PROFILE_KEY);
     state.user = null; state.joinedGroupIds.clear();
     updateNav(); renderGroups(); setStatus('로그아웃했습니다.');
+}
+
+async function hydrateSupabaseSession() {
+    if (!supabaseClient) return;
+    try {
+        const { data, error } = await supabaseClient.auth.getSession();
+        if (error) throw error;
+        if (data.session?.user) {
+            const profile = await remoteProfileForUser(data.session.user.id);
+            if (profile?.nickname) {
+                applyRemoteProfile(profile);
+                updateNav();
+                renderGroups();
+                await loadRemoteMemberships();
+            }
+        }
+        await loadRemoteActivities();
+        supabaseState.hydrated = true;
+    } catch (error) {
+        console.error('Supabase session restore failed', error);
+        if (!state.user) setStatus(supabaseErrorMessage(error, 'Supabase 세션을 복원하지 못했습니다. 잠시 후 다시 시도해 주세요.'), 'warning');
+    }
 }
 
 function validateActivity(activity) {
@@ -1107,6 +1464,7 @@ async function handleCreate(event) {
             setStatus('모임이 게시되지 않았습니다.', 'warning');
             return;
         }
+        if (supabaseClient) await persistRemoteActivity(activity);
         activity.status = 'recruiting';
         persistence.publish(activity);
         state.joinedGroupIds.add(activity.id);
@@ -1125,12 +1483,36 @@ function showFeedback(message, safe) {
     elements.feedbackText.textContent = message;
 }
 
-function toggleParticipation(groupId) {
+async function toggleParticipation(groupId) {
     if (!state.user) return setStatus('로그인 후 참여할 수 있습니다.', 'warning');
     const group = state.groups.find((item) => item.id === groupId);
     if (!group || group.status !== 'recruiting') return setStatus('현재 참여할 수 없는 모임입니다.', 'warning');
     const joined = state.joinedGroupIds.has(groupId);
     ensureGroupMetadata(group);
+    if (supabaseClient && group.remote) {
+        try {
+            const functionName = joined ? 'withdraw_activity' : 'join_activity';
+            const { data, error } = await supabaseClient.rpc(functionName, { p_activity_id: groupId });
+            if (error) throw error;
+            const result = Array.isArray(data) ? data[0] : data;
+            if (result?.status === 'full_or_unavailable') return setStatus('모집 인원이 가득 찼거나 참여할 수 없는 모임입니다.', 'warning');
+            if (result?.status === 'already_joined') return setStatus('이미 참여 중인 모임입니다.', 'info');
+            if (result?.status === 'not_joined') return setStatus('현재 참여 중인 모임이 아닙니다.', 'info');
+            group.participants = Number(result?.participant_count ?? group.participants + (joined ? -1 : 1));
+            if (joined) {
+                state.joinedGroupIds.delete(groupId);
+                setStatus('Supabase에서 모임 참여를 취소했습니다.');
+            } else {
+                state.joinedGroupIds.add(groupId);
+                setStatus(`'${group.title}' 모임에 참여했습니다.`, 'success');
+                queueGenderBalanceNotification(group);
+            }
+            persistence.update(group); renderGroups();
+        } catch (error) {
+            setStatus(supabaseErrorMessage(error, 'Supabase에서 참여 상태를 저장하지 못했습니다. 다시 시도해 주세요.'), 'warning');
+        }
+        return;
+    }
     const privateState = privateGroupState.get(group.id);
     const viewerGender = getPrivateProfile()?.gender;
     if (joined) {
@@ -1152,7 +1534,7 @@ function toggleParticipation(groupId) {
 function reportActivity(groupId) {
     if (!state.user) return setStatus('로그인 후 신고할 수 있습니다.', 'warning');
     const reason = window.prompt('신고 사유를 간단히 입력해 주세요.');
-    if (!reason || !reason.trim()) return;
+    if (!reason || !reason.trim()) return setStatus('신고 사유가 입력되지 않아 신고를 취소했습니다.', 'info');
     const reports = safeJson(localStorage.getItem(REPORTS_KEY), []);
     reports.push({ id: `${Date.now()}`, groupId, reporterId: state.user.id, reason: reason.trim().slice(0, 300), createdAt: new Date().toISOString() });
     localStorage.setItem(REPORTS_KEY, JSON.stringify(reports));
@@ -1265,9 +1647,15 @@ function setView(view, shouldScroll = true, updateUrl = true) {
 }
 
 function openCreate() {
-    if (!state.user) return openLogin();
+    if (!state.user) {
+        openLogin();
+        setStatus('모임 만들기는 로그인 후 이용할 수 있어요. 로그인 창에서 먼저 시작해 주세요.', 'info');
+        return false;
+    }
     setView('activities', false);
     elements.createModal.classList.remove('hidden'); elements.feedback.classList.add('hidden'); $('input-title').focus();
+    setStatus('새 모임 정보를 입력한 뒤 안전 검토 후 모임 등록을 눌러 주세요.', 'info');
+    return true;
 }
 function closeCreate() { elements.createModal.classList.add('hidden'); elements.form.reset(); elements.feedback.classList.add('hidden'); }
 
@@ -1287,6 +1675,37 @@ function openConnectionRecommendation(interest = '', comfort = 'any') {
     window.setTimeout(() => $('input-interest').focus(), 250);
 }
 
+function handleStaticButtonClick(button, event) {
+    const actions = {
+        'btn-login': openLogin,
+        'btn-signup': openSignup,
+        'btn-close-login': closeLogin,
+        'btn-close-signup': closeSignup,
+        'btn-create': openCreate,
+        'nav-create': openCreate,
+        'btn-create-main': openCreate,
+        'btn-create-guide': openCreate,
+        'btn-profile': openProfile,
+        'btn-close-profile': closeProfile,
+        'btn-logout': logout,
+        'btn-notifications': openNotifications,
+        'btn-close-notifications': closeNotifications,
+        'btn-close-create': closeCreate,
+        'btn-apply-search': applyGroupSearch,
+        'btn-open-chatbot': openChatbot,
+        'btn-close-chatbot': closeChatbot,
+        'btn-close-feedback': closeFeedback,
+        'btn-check-id': checkSignupId,
+        'btn-send-verification': sendSignupVerification,
+        'btn-complete-verification': completeSignupVerification
+    };
+    const action = actions[button.id];
+    if (!action) return false;
+    event.preventDefault();
+    action();
+    return true;
+}
+
 function init() {
     state.user = publicUser(safeJson(localStorage.getItem(USER_KEY), null));
     if (state.user && state.user.trustScore === 36.5) {
@@ -1295,31 +1714,27 @@ function init() {
     }
     if (state.user && getPrivateProfile()?.userId === state.user.id) state.filters.ageGroup = 'mine';
     persistence.load(); loadPosts(); loadNotifications(); renderCategoryOptions(); migrateCurrentUserAccount(state.user); updateNav(); renderGroups(); renderBoard(); cancelUnderfilledGroups(); setView(viewFromLocation(), false, false);
-    elements.profileButton.addEventListener('click', openProfile); elements.closeProfile.addEventListener('click', closeProfile); elements.profileForm.addEventListener('submit', submitProfile); elements.notificationsButton.addEventListener('click', openNotifications); elements.closeNotifications.addEventListener('click', closeNotifications); $('btn-check-id').addEventListener('click', checkSignupId); $('signup-id').addEventListener('input', () => { signupState.idAvailable = false; signupState.idCheckedId = ''; $('signup-id').dataset.checkedId = ''; $('signup-id').dataset.idAvailable = 'false'; $('signup-id-status').textContent = '아이디가 변경되었습니다. 다시 중복 확인해 주세요.'; $('signup-id-status').dataset.tone = 'info'; }); $('signup-age').addEventListener('input', enforceSignupAge); $('btn-send-verification').addEventListener('click', sendSignupVerification); $('signup-verification-contact').addEventListener('input', resetSignupVerification); $('signup-verification-method').addEventListener('change', resetSignupVerification); $('btn-complete-verification').addEventListener('click', completeSignupVerification); elements.logout.addEventListener('click', logout);
-    elements.create.addEventListener('click', openCreate); elements.closeCreate.addEventListener('click', closeCreate);
+    elements.profileForm.addEventListener('submit', submitProfile);
+    $('signup-id').addEventListener('input', () => { signupState.idAvailable = false; signupState.idCheckedId = ''; $('signup-id').dataset.checkedId = ''; $('signup-id').dataset.idAvailable = 'false'; $('signup-id-status').textContent = '아이디가 변경되었습니다. 다시 중복 확인해 주세요.'; $('signup-id-status').dataset.tone = 'info'; });
+    $('signup-age').addEventListener('input', enforceSignupAge);
+    $('signup-verification-contact').addEventListener('input', resetSignupVerification);
+    $('signup-verification-method').addEventListener('change', resetSignupVerification);
     elements.form.addEventListener('submit', handleCreate);
-    elements.closeFeedback.addEventListener('click', closeFeedback);
     elements.feedbackForm.addEventListener('submit', submitFeedback);
     elements.recommendationForm.addEventListener('submit', handleRecommendation);
     elements.search.addEventListener('input', (event) => { state.filters.query = event.target.value; renderGroups(); renderBoard(); });
-    elements.applySearch.addEventListener('click', applyGroupSearch);
-    elements.createMain.addEventListener('click', openCreate);
-    elements.createGuide.addEventListener('click', openCreate);
-    elements.navCreate.addEventListener('click', openCreate);
-    elements.openChat.addEventListener('click', openChatbot); elements.closeChat.addEventListener('click', closeChatbot); elements.chatForm.addEventListener('submit', handleChatbot);
+    elements.chatForm.addEventListener('submit', handleChatbot);
     window.addEventListener('hashchange', () => setView(viewFromLocation(), true, false));
     window.addEventListener('popstate', () => setView(viewFromLocation(), true, false));
     window.addEventListener('storage', (event) => { if (event.key === GROUPS_KEY) { persistence.load(); renderGroups(); } if (event.key === NOTIFICATIONS_KEY) { loadNotifications(); renderNotifications(); } });
     window.addEventListener('dg:groups-changed', renderGroups);
     window.setInterval(cancelUnderfilledGroups, 30_000);
+    void hydrateSupabaseSession();
 }
 
 document.addEventListener('click', (event) => {
     const button = event.target.closest?.('button');
-    if (button?.id === 'btn-login') { event.preventDefault(); openLogin(); return; }
-    if (button?.id === 'btn-signup') { event.preventDefault(); openSignup(); return; }
-    if (button?.id === 'btn-close-login') { event.preventDefault(); closeLogin(); return; }
-    if (button?.id === 'btn-close-signup') { event.preventDefault(); closeSignup(); return; }
+    if (button && handleStaticButtonClick(button, event)) return;
     const target = event.target.closest?.('[data-view-target]');
     if (!target || target.id === 'nav-create') return;
     event.preventDefault();
