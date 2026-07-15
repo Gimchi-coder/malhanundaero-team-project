@@ -627,14 +627,25 @@ function ageGroupLabel(ageGroup) {
     return { all: '전 연령', '20s': '20대', '30s': '30대', '40s': '40대', '50plus': '50대 이상' }[ageGroup] || '전 연령';
 }
 
-function normalizeActivityAgeGroup(ageGroup) {
-    return ['all', '20s', '30s', '40s', '50plus'].includes(ageGroup) ? ageGroup : 'all';
+function normalizeActivityAgeGroups(ageGroups) {
+    const raw = Array.isArray(ageGroups) ? ageGroups.join(' ') : String(ageGroups || '');
+    const normalized = raw.normalize('NFKC').toLowerCase().replace(/\s/g, '');
+    if (!normalized || /all|전연령/.test(normalized)) return ['all'];
+    const values = [
+        [/20(?:s|대)?/, '20s'], [/30(?:s|대)?/, '30s'], [/40(?:s|대)?/, '40s'], [/50(?:plus|s|대이상|대)?/, '50plus']
+    ].filter(([pattern]) => pattern.test(normalized)).map(([, value]) => value);
+    return values.length ? [...new Set(values)] : ['all'];
 }
 
-function ageFilterMatchesGroup(groupAgeGroup, selectedFilter, viewerAgeGroup) {
-    const normalizedGroupAge = normalizeActivityAgeGroup(groupAgeGroup);
-    if (selectedFilter === 'mine') return normalizeActivityAgeGroup(viewerAgeGroup) !== 'all' && normalizedGroupAge === normalizeActivityAgeGroup(viewerAgeGroup);
-    return normalizedGroupAge === 'all';
+function normalizeActivityAgeGroup(ageGroup) {
+    return normalizeActivityAgeGroups(ageGroup)[0];
+}
+
+function ageFilterMatchesGroup(groupAgeGroups, selectedFilter, viewerAgeGroup) {
+    const normalizedGroupAges = normalizeActivityAgeGroups(groupAgeGroups);
+    const normalizedViewerAge = normalizeActivityAgeGroup(viewerAgeGroup);
+    if (selectedFilter === 'mine') return normalizedViewerAge !== 'all' && normalizedGroupAges.includes(normalizedViewerAge);
+    return normalizedGroupAges.includes('all');
 }
 
 function getPrivateProfile() {
@@ -726,7 +737,7 @@ function seedGroups() {
             purpose: '업무에 바로 쓰는 AI 활용법을 함께 실습',
             description: '각자 사례를 가져와 서로의 방법을 나누고 다음 주 실천 목표를 정합니다.',
             location: '합정 공유오피스 라운지', scheduledAt: new Date(Date.now() + 120 * 60 * 60 * 1000).toISOString(),
-            status: 'recruiting', participants: 2, maxParticipants: 6, ageGroup: '30s', category: 'AI 활용 스터디', hostTrustScore: 66,
+            status: 'recruiting', participants: 2, maxParticipants: 6, ageGroup: '20~30대', category: 'AI 활용 스터디', hostTrustScore: 66,
             participantIds: [], privateGenderCounts: { male: 1, female: 1 }
         },
         {
@@ -784,11 +795,17 @@ const ACTIVITY_EXAMPLES = [
     { family: 'hobby', title: '동네 사진 한 컷 산책', description: '잘 찍지 않아도 괜찮은 느린 사진 산책이에요.', temperature: 52 },
     { family: 'hobby', title: '뜨개질 손을 쉬지 않는 시간', description: '각자 만들며 필요할 때만 대화해요.', temperature: 60 },
     { family: 'sports', title: '천천히 동네 한 바퀴', description: '속도보다 함께 걷는 시간을 소중히 여겨요.', temperature: 64 },
+    { family: 'sports', title: '자전거 길을 가볍게 익히기', description: '각자 페이스를 지키며 쉬어 가요.', temperature: 55 },
     { family: 'social', title: '커피 한 잔, 가벼운 안부', description: '처음이라도 부담 없이 1시간만 만나요.', temperature: 54 },
+    { family: 'social', title: '동네 브런치 한 접시', description: '대화가 길어지지 않아도 괜찮은 느슨한 자리예요.', temperature: 49 },
     { family: 'game', title: '협동 게임 한 판', description: '승패보다 같이 익히는 과정을 즐겨요.', temperature: 67 },
+    { family: 'game', title: '처음 하는 보드게임 배우기', description: '규칙을 천천히 설명하며 함께 시작해요.', temperature: 61 },
     { family: 'culture', title: '전시 보고 각자 한 줄 감상', description: '감상을 길게 말하지 않아도 괜찮아요.', temperature: 58 },
+    { family: 'culture', title: '동네 극장 조용한 관람', description: '보고 난 뒤 원하면 짧은 감상만 나눠요.', temperature: 70 },
     { family: 'community', title: '주말 공원 플로깅', description: '동네를 가볍게 돌며 작은 변화를 만들어요.', temperature: 72 },
+    { family: 'community', title: '보호소 물품 정리 돕기', description: '필요한 일을 나누며 무리 없이 참여해요.', temperature: 65 },
     { family: 'project', title: '작은 앱 아이디어 노트', description: '완성보다 시작을 함께 응원하는 모임이에요.', temperature: 63 },
+    { family: 'project', title: '포트폴리오 한 페이지 다듬기', description: '각자 작업하고 막힐 때만 가볍게 물어봐요.', temperature: 57 },
     { family: 'other', title: '도예 소품 한 가지 만들기', description: '처음 만져봐도 괜찮은 원데이 작업이에요.', temperature: 50 },
     { family: 'other', title: '계절 꽃 한 송이 고르기', description: '가까운 동네에서 취향을 천천히 나눠요.', temperature: 46 }
 ];
@@ -819,8 +836,9 @@ function inferConversationLevel(group) {
 }
 
 function ensureGroupMetadata(group) {
-    group.ageGroup = normalizeActivityAgeGroup(group.ageGroup);
-    group.audienceType = group.ageGroup === 'all' ? 'all_ages' : 'age_specific';
+    group.ageGroups = normalizeActivityAgeGroups(group.ageGroups || group.ageGroup);
+    group.ageGroup = group.ageGroups[0];
+    group.audienceType = group.ageGroups.includes('all') ? 'all_ages' : 'age_specific';
     group.category = group.category || '기타 모임';
     group.categoryFamily = ACTIVITY_FAMILIES.some((family) => family.id === group.categoryFamily) ? group.categoryFamily : activityFamilyForType(group.category);
     group.conversationLevel = group.conversationLevel || inferConversationLevel(group);
@@ -1150,7 +1168,7 @@ function groupMatchesFilters(group) {
     ensureGroupMetadata(group);
     const searchable = normalizeSafetyText(`${group.title} ${group.purpose} ${group.description} ${group.category} ${conversationLevelLabel(group.conversationLevel)}`);
     const queryMatches = !query || searchable.includes(query);
-    const ageMatches = ageFilterMatchesGroup(group.ageGroup, state.filters.ageGroup, getViewerAgeGroup());
+    const ageMatches = ageFilterMatchesGroup(group.ageGroups, state.filters.ageGroup, getViewerAgeGroup());
     const categoryMatches = state.filters.category === 'all' || group.categoryFamily === state.filters.category;
     return queryMatches && ageMatches && categoryMatches;
 }

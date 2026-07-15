@@ -11,7 +11,7 @@ function extractFunction(name) {
     return source.slice(start, end + 2);
 }
 
-const filterFunctions = `${extractFunction('normalizeActivityAgeGroup')}\n${extractFunction('ageFilterMatchesGroup')}`;
+const filterFunctions = `${extractFunction('normalizeActivityAgeGroups')}\n${extractFunction('normalizeActivityAgeGroup')}\n${extractFunction('ageFilterMatchesGroup')}`;
 const { ageFilterMatchesGroup } = new Function(`${filterFunctions}; return { ageFilterMatchesGroup };`)();
 
 // 정상: 전체 연령 필터에는 전 연령 공개 모임만 남는다.
@@ -24,8 +24,13 @@ assert.equal(ageFilterMatchesGroup('all', 'mine', '20s'), false);
 assert.equal(ageFilterMatchesGroup('30s', 'mine', '20s'), false);
 assert.equal(ageFilterMatchesGroup('20s', 'mine', 'all'), false);
 
+// 복수 연령대는 하나라도 겹치면 내 연령대 목록에 표시한다.
+assert.equal(ageFilterMatchesGroup('20~30대', 'mine', '20s'), true);
+assert.equal(ageFilterMatchesGroup('20~30대', 'mine', '30s'), true);
+assert.equal(ageFilterMatchesGroup('20~30대', 'mine', '40s'), false);
+
 assert.match(source, /id: 'other', label: '기타'/);
 assert.doesNotMatch(source, /id: 'experience', label: '체험형'/);
 assert.match(source, /isAvailableForDiscovery\(group\)/);
 
-console.log(JSON.stringify({ passed: true, suite: 'activity-filter', checks: 11 }));
+console.log(JSON.stringify({ passed: true, suite: 'activity-filter', checks: 14 }));
