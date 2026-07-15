@@ -13,3 +13,6 @@ credentials/
 secrets/
 .vercel
 .env*
+config.local.js
+config.*.local.js
+.supabase/

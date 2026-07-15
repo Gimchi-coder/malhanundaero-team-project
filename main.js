@@ -18,6 +18,7 @@ const POSTS_KEY = 'dg_board_posts_v1';
 const OPERATIONS_KEY = 'dg_operations_v1';
 const RECOMMENDATION_CACHE_KEY = 'dg_recommendation_cache_v1';
 const RECOMMENDATION_CACHE_STATS_KEY = 'dg_recommendation_cache_stats_v1';
+const LOCATION_KEY = 'dg_user_location_v1';
 
 const state = {
     user: null,
@@ -93,19 +94,19 @@ elements.boardEmpty = $('board-empty');
 elements.categoryList = $('category-list');
 elements.activityExamples = $('activity-examples');
 elements.signupSubmitStatus = $('signup-submit-status');
-elements.chatModal = $('modal-chatbot');
-elements.openChat = $('btn-open-chatbot');
-elements.closeChat = $('btn-close-chatbot');
-elements.chatForm = $('form-chatbot');
-elements.chatInput = $('input-chatbot');
-elements.chatMessages = $('chat-messages');
 elements.enterActivities = $('btn-enter-activities');
+elements.locationSetupModal = $('modal-location-setup');
+elements.closeLocationSetup = $('btn-close-location-setup');
+elements.locationSetupForm = $('form-location-setup');
+elements.locationSetupStatus = $('location-setup-status');
+elements.locationModeSelect = $('input-location-mode');
+elements.locationManualGroup = $('location-manual-group');
+elements.openLocationSetup = $('btn-open-location-setup');
 elements.recommendationDock = $('ai-recommendation');
 elements.viewTabs = [...document.querySelectorAll('[data-view-target]')];
 elements.navCreate = $('nav-create');
-const signupState = { idAvailable: false, idCheckedId: '', verificationComplete: false };
-
 const safeJson = (value, fallback) => {
+    if (value === null || value === undefined) return fallback;
     try { return JSON.parse(value); } catch { return fallback; }
 };
 
@@ -285,8 +286,7 @@ const ACTIVITY_FAMILIES = [
     { id: 'game', label: '게임', match: /리그 오브 레전드|발로란트|마인크래프트|스팀|닌텐도|모바일 게임|추리 게임/ },
     { id: 'culture', label: '문화생활', match: /연극|뮤지컬|전시|박물관|역사 유적|축제|콘서트|버스킹/ },
     { id: 'community', label: '봉사·사회활동', match: /플로깅|유기동물|환경정화|교육봉사|헌혈|지역 축제 봉사/ },
-    { id: 'project', label: '프로젝트', match: /창업|사이드 프로젝트|앱 개발|게임 개발|공모전|해커톤|영상 제작|팟캐스트|유튜브|책 출판/ },
-    { id: 'experience', label: '체험형', match: /베이킹|요리|바리스타|도예|향수|비누|꽃꽂이|원데이/ }
+    { id: 'project', label: '프로젝트', match: /창업|사이드 프로젝트|앱 개발|게임 개발|공모전|해커톤|영상 제작|팟캐스트|유튜브|책 출판/ }
 ];
 
 function activityFamilyForType(type) {
@@ -531,20 +531,24 @@ function createText(tag, value, className) {
     return node;
 }
 
-function groupMatchesFilters(group) {
+function groupMatchesFiltersExceptCategory(group) {
     const query = normalizeSafetyText(state.filters.query);
     const searchable = normalizeSafetyText(`${group.title} ${group.purpose} ${group.description} ${group.category}`);
     const queryMatches = !query || searchable.includes(query);
     const selectedAge = state.filters.ageGroup === 'mine' ? getViewerAgeGroup() : state.filters.ageGroup;
     const ageMatches = selectedAge === 'all' || group.ageGroup === 'all' || group.ageGroup === selectedAge;
+    return queryMatches && ageMatches;
+}
+
+function groupMatchesFilters(group) {
     const categoryMatches = state.filters.category === 'all' || group.categoryFamily === state.filters.category;
-    return queryMatches && ageMatches && categoryMatches;
+    return groupMatchesFiltersExceptCategory(group) && categoryMatches;
 }
 
 function renderAgeFilters() {
     if (!elements.ageFilters) return;
     elements.ageFilters.replaceChildren();
-    [['all', '전체 모집'], ['mine', '내 연령대'], ['20s', '20대'], ['30s', '30대'], ['40s', '40대'], ['50plus', '50대 이상']].forEach(([value, label]) => {
+    [['all', '전체 모집'], ['mine', '내 연령대']].forEach(([value, label]) => {
         const button = createText('button', label, `filter-btn${state.filters.ageGroup === value ? ' active' : ''}`);
         button.type = 'button';
         button.dataset.ageFilter = value;
@@ -556,7 +560,7 @@ function renderAgeFilters() {
 function renderCategoryFilters() {
     if (!elements.categoryFilters) return;
     elements.categoryFilters.replaceChildren();
-    const recruiting = state.groups.filter((group) => group.status === 'recruiting');
+    const recruiting = state.groups.filter((group) => group.status === 'recruiting' && groupMatchesFiltersExceptCategory(group));
     const options = [{ id: 'all', label: '전체 활동' }, ...ACTIVITY_FAMILIES.map((family) => ({ id: family.id, label: family.label }))];
     options.forEach(({ id, label }) => {
         const count = id === 'all' ? recruiting.length : recruiting.filter((group) => group.categoryFamily === id).length;
@@ -713,24 +717,52 @@ function queueGenderBalanceNotification(group) {
     setStatus('참여자 구성에 관한 확인 알림이 도착했습니다. 성비 숫자는 공개하지 않습니다.', 'info');
 }
 
+const COMFORT_QUERY_TERMS = {
+    quiet: ['조용', '말없이', '각자', '혼자', '차분'],
+    light_conversation: ['대화', '이야기', '수다', '소통'],
+    active: ['산책', '운동', '걷기', '러닝', '스트레칭', '활동적', '움직'],
+    any: []
+};
+const COMFORT_LABELS = { quiet: '말없이 각자 시간', light_conversation: '가벼운 대화', active: '함께 움직이는 활동', any: '편한 방식' };
+const TIME_WINDOW_LABELS = { today: '오늘', this_week: '이번 주', any: '언제든' };
+
+function tokenizeForIndex(text) {
+    return normalizeSafetyText(text).split(/[\s,.、，/·]+/).filter((token) => token.length >= 2);
+}
+
 function localRecommendationMatches({ interest, comfort, timeWindow }) {
-    const startedAt = Date.now();
     const interestTerms = String(interest || '').toLowerCase().split(/[\s,、，/]+/).map((term) => normalizeSafetyText(term)).filter(Boolean);
+    const comfortTerms = COMFORT_QUERY_TERMS[comfort] || [];
     const now = Date.now();
-    const matches = state.groups
+
+    const index = state.groups
         .filter((group) => group.status === 'recruiting')
-        .map((group) => {
-            const searchable = normalizeSafetyText(`${group.title} ${group.purpose} ${group.description}`);
-            const interestHit = interestTerms.length === 0 ? 0.25 : interestTerms.some((term) => searchable.includes(term)) ? 0.55 : 0;
-            const comfortText = comfort === 'quiet' && /말없이|각자|조용/.test(searchable) ? 0.25 : comfort === 'light_conversation' && /대화|이야기/.test(searchable) ? 0.25 : comfort === 'active' && /산책|운동|걷기/.test(searchable) ? 0.25 : comfort === 'any' ? 0.1 : 0;
+        .map((group) => ({ group, tokens: tokenizeForIndex(`${group.title} ${group.purpose} ${group.description} ${group.category || ''}`) }));
+
+    const matches = index
+        .map(({ group, tokens }) => {
+            const evidence = [];
+            const matchedInterestTerms = interestTerms.filter((term) => tokens.some((token) => token.includes(term) || term.includes(token)));
+            const interestScore = interestTerms.length ? matchedInterestTerms.length / interestTerms.length : 0;
+            matchedInterestTerms.forEach((term) => evidence.push(`'${interest}' 관심사 중 '${term}'이(가) 모임 설명에 있어요.`));
+
+            const matchedComfortTerms = comfortTerms.filter((term) => tokens.some((token) => token.includes(term) || term.includes(token)));
+            const comfortScore = comfortTerms.length ? matchedComfortTerms.length / comfortTerms.length : comfort === 'any' ? 0.4 : 0;
+            if (matchedComfortTerms.length) evidence.push(`'${COMFORT_LABELS[comfort]}' 방식과 맞는 내용이 모임 설명에 있어요.`);
+
             const daysAway = (new Date(group.scheduledAt).getTime() - now) / (24 * 60 * 60 * 1000);
-            const timeHit = timeWindow === 'today' && daysAway <= 1.2 ? 0.15 : timeWindow === 'this_week' && daysAway <= 7 ? 0.15 : timeWindow === 'any' ? 0.1 : 0;
-            const fit = Math.min(0.99, interestHit + comfortText + timeHit + 0.05);
-            const reason = interestHit >= 0.5 ? `${interest} 관심과 목적이 맞고, ` : '모임 목적이 부담 없이 참여하기 좋고, ';
-            const comfortReason = comfort === 'quiet' ? '조용히 각자의 시간을 보낼 수 있어요.' : comfort === 'active' ? '함께 움직이는 활동이라 잘 맞아요.' : '참여 방식이 가벼워서 시작하기 좋아요.';
-            return { activityId: group.id, fit, reason: `${reason}${comfortReason}` };
+            const timeHit = timeWindow === 'today' ? daysAway <= 1.2 : timeWindow === 'this_week' ? daysAway <= 7 : true;
+            const timeScore = timeWindow === 'any' ? 0.4 : timeHit ? 1 : 0;
+            if (timeWindow !== 'any' && timeHit) evidence.push(`참여 시기(${TIME_WINDOW_LABELS[timeWindow]}) 조건에 맞는 일정이에요.`);
+
+            const fit = Math.min(0.99, interestScore * 0.6 + comfortScore * 0.25 + timeScore * 0.15);
+            if (!evidence.length) evidence.push('현재 모집 중인 활동 중 하나예요.');
+            const reason = matchedInterestTerms.length
+                ? `'${matchedInterestTerms.join(', ')}' 관심사와 목적이 맞고, ${COMFORT_LABELS[comfort]}에도 어울려요.`
+                : `모임 목적이 부담 없이 참여하기 좋고, ${COMFORT_LABELS[comfort]}에도 어울려요.`;
+            return { activityId: group.id, fit, reason, evidence };
         })
-        .filter((item) => item.fit >= 0.35)
+        .filter((item) => item.fit >= 0.15)
         .sort((a, b) => b.fit - a.fit)
         .slice(0, 3);
     return matches;
@@ -779,7 +811,8 @@ function renderRecommendations(matches, preferences) {
         if (!group) return;
         const card = document.createElement('article');
         card.className = 'recommendation-card';
-        card.append(createText('div', `${Math.round(match.fit * 100)}% 잘 맞아요`, 'fit-badge'), createText('h3', group.title), createText('p', match.reason, 'recommendation-reason'), createText('small', '근거: 현재 모집 중인 활동 정보와 입력한 조건', 'recommendation-source'), createText('span', `📍 ${group.location} · ${formatDate(group.scheduledAt)}`, 'card-meta'));
+        const evidenceText = Array.isArray(match.evidence) && match.evidence.length ? `근거: ${match.evidence.join(' ')}` : '근거: 현재 모집 중인 활동 정보와 입력한 조건';
+        card.append(createText('div', `${Math.round(match.fit * 100)}% 잘 맞아요`, 'fit-badge'), createText('h3', group.title), createText('p', match.reason, 'recommendation-reason'), createText('small', evidenceText, 'recommendation-source'), createText('span', `📍 ${group.location} · ${formatDate(group.scheduledAt)}`, 'card-meta'));
         const view = document.createElement('button');
         view.type = 'button'; view.className = 'btn-outline btn-small'; view.textContent = '활동 보기';
         view.addEventListener('click', () => {
@@ -836,17 +869,10 @@ function openSignup() {
 function closeSignup() {
     elements.signupModal.classList.add('hidden');
     elements.signupForm.reset();
-    signupState.idAvailable = false;
-    signupState.idCheckedId = '';
-    signupState.verificationComplete = false;
-    $('signup-id').dataset.checkedId = '';
-    $('signup-id').dataset.idAvailable = '';
-    $('signup-id-status').textContent = '';
     elements.signupSubmitStatus.textContent = '';
     elements.signupSubmitStatus.dataset.tone = '';
     $('signup-age-status').textContent = '만 20세 이상만 가입할 수 있어요.';
     $('signup-age-status').dataset.tone = '';
-    $('signup-verification-status').textContent = '개발용 인증 흐름입니다.';
 }
 
 function openNicknameSetup() {
@@ -901,49 +927,7 @@ function submitNicknameSetup(event) {
     updateNav();
     setView('activities', false);
     setStatus('회원가입과 공개 닉네임 설정이 완료되어 자동 로그인되었습니다. 그룹 활동을 시작해 보세요.', 'success');
-}
-
-function checkSignupId() {
-    const input = $('signup-id');
-    const id = input.value.trim().toLowerCase();
-    const status = $('signup-id-status');
-    if (!/^[a-z0-9][a-z0-9_-]{3,23}$/.test(id)) {
-        signupState.idAvailable = false;
-        signupState.idCheckedId = '';
-        input.dataset.checkedId = '';
-        input.dataset.idAvailable = 'false';
-        status.textContent = '아이디는 영문·숫자·_- 조합 4~24자로 입력해 주세요.';
-        status.dataset.tone = 'warning';
-        return;
-    }
-    const usedIds = safeJson(localStorage.getItem('dg_signup_ids_v1'), []);
-    const usedId = Array.isArray(usedIds) && usedIds.some((usedIdValue) => normalizeLoginId(usedIdValue) === id);
-    const accountIdUsed = getAccounts().some((account) => normalizeLoginId(account.loginId) === id);
-    signupState.idAvailable = !usedId && !accountIdUsed;
-    signupState.idCheckedId = id;
-    input.dataset.checkedId = id;
-    input.dataset.idAvailable = String(signupState.idAvailable);
-    status.textContent = signupState.idAvailable ? '사용 가능한 아이디입니다.' : '이미 사용 중인 아이디입니다.';
-    status.dataset.tone = signupState.idAvailable ? 'success' : 'warning';
-}
-
-function sendSignupVerification() {
-    const contact = $('signup-verification-contact').value.trim();
-    if (!contact) {
-        $('signup-verification-status').textContent = '인증 연락처를 입력해 주세요.';
-        $('signup-verification-status').dataset.tone = 'warning';
-        $('signup-verification-contact').focus();
-        return false;
-    }
-    signupState.verificationComplete = true;
-    $('signup-verification-status').textContent = '본인인증이 완료되었습니다. (개발용)';
-    $('signup-verification-status').dataset.tone = 'success';
-}
-
-function resetSignupVerification() {
-    signupState.verificationComplete = false;
-    $('signup-verification-status').textContent = '인증 연락처가 변경되었습니다. 다시 인증해 주세요.';
-    $('signup-verification-status').dataset.tone = 'info';
+    if (!getUserLocationSettings(state.user.id)) openLocationSetup();
 }
 
 function enforceSignupAge(event) {
@@ -962,75 +946,48 @@ function enforceSignupAge(event) {
     $('signup-age-status').dataset.tone = '';
 }
 
-function completeSignupVerification() {
-    const code = $('signup-verification-code').value.trim();
-    if (!signupState.verificationComplete) {
-        $('signup-verification-status').textContent = '먼저 인증하기를 눌러 인증을 시작해 주세요.';
-        $('signup-verification-status').dataset.tone = 'warning';
-        return;
-    }
-    if (!code) {
-        $('signup-verification-status').textContent = '개발용 인증은 이미 완료되었습니다. 인증번호 입력은 선택 사항입니다.';
-        $('signup-verification-status').dataset.tone = 'success';
-        return;
-    }
-    if (!/^\d{4,6}$/.test(code)) {
-        $('signup-verification-status').textContent = '인증번호가 올바르지 않습니다.';
-        $('signup-verification-status').dataset.tone = 'info';
-        return;
-    }
-    $('signup-verification-status').textContent = code === '123456'
-        ? '본인인증이 완료되었습니다. (개발용)'
-        : '인증하기 단계가 완료되어 회원가입을 계속할 수 있습니다. (개발용)';
-    $('signup-verification-status').dataset.tone = 'success';
-}
-
 async function submitSignup(event) {
     event.preventDefault();
+
     const requiredFields = [
-        ['signup-name', '이름'], ['signup-gender', '성별'], ['signup-age', '나이'], ['signup-phone', '휴대폰 번호'],
-        ['signup-id', '아이디'], ['signup-password', '비밀번호'], ['signup-password-confirm', '비밀번호 확인'], ['signup-verification-contact', '인증 연락처']
+        ['signup-name', '이름'], ['signup-gender', '성별'], ['signup-age', '나이'],
+        ['signup-email', '이메일'], ['signup-password', '비밀번호'], ['signup-password-confirm', '비밀번호 확인']
     ];
     for (const [fieldId, label] of requiredFields) {
         if (!$(`${fieldId}`).value.trim()) return setSignupStatus(`${label}을(를) 입력해 주세요.`, 'warning', fieldId);
     }
     if (!$('signup-privacy-consent').checked) return setSignupStatus('개인정보 수집·이용 동의가 필요합니다.', 'warning', 'signup-privacy-consent');
+
+    const email = $('signup-email').value.trim().toLowerCase();
+    const password = $('signup-password').value;
     const age = Number($('signup-age').value);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return setSignupStatus('이메일 주소 형식이 올바르지 않습니다.', 'warning', 'signup-email');
     if (!Number.isInteger(age) || age < 20 || age > 100) {
         $('signup-age-status').textContent = '20세 미만은 가입할 수 없습니다.';
         $('signup-age-status').dataset.tone = 'warning';
         return setSignupStatus('만 20세 이상만 가입할 수 있습니다.', 'warning', 'signup-age');
     }
-    const password = $('signup-password').value;
-    const idInput = $('signup-id');
-    const id = idInput.value.trim().toLowerCase();
     if (password.length < 8) return setSignupStatus('비밀번호는 8자 이상 입력해 주세요.', 'warning', 'signup-password');
-    if (idInput.dataset.checkedId !== id) return setSignupStatus('현재 아이디의 중복 확인을 먼저 완료해 주세요.', 'warning', 'signup-id');
-    if (idInput.dataset.idAvailable !== 'true') return setSignupStatus('사용할 수 없는 아이디입니다. 다른 아이디를 입력해 주세요.', 'warning', 'signup-id');
-    const usedIds = safeJson(localStorage.getItem('dg_signup_ids_v1'), []);
-    const usedId = Array.isArray(usedIds) && usedIds.some((usedIdValue) => normalizeLoginId(usedIdValue) === id);
-    const accountIdUsed = getAccounts().some((account) => normalizeLoginId(account.loginId) === id);
-    if (usedId || accountIdUsed) return setSignupStatus('이미 사용 중인 아이디입니다. 다른 아이디를 입력해 주세요.', 'warning', 'signup-id');
     if (password !== $('signup-password-confirm').value) return setSignupStatus('비밀번호와 확인값이 서로 일치하지 않습니다.', 'warning', 'signup-password-confirm');
-    if (!signupState.verificationComplete) return setSignupStatus('인증하기와 인증 확인을 완료해 주세요.', 'warning', 'signup-verification-code');
+    if (getAccounts().some((account) => normalizeLoginId(account.loginId) === normalizeLoginId(email))) return setSignupStatus('이미 가입된 이메일입니다. 다른 이메일을 입력해 주세요.', 'warning', 'signup-email');
+
     let passwordHash;
     try {
         passwordHash = await hashSecret(password);
     } catch {
-        return setSignupStatus('비밀번호를 안전하게 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+        return setSignupStatus('비밀번호를 안전하게 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.', 'warning');
     }
-    localStorage.setItem('dg_signup_ids_v1', JSON.stringify([...new Set([...usedIds, id.toLowerCase()])]));
+
     state.pendingSignupId = crypto.randomUUID?.() || String(Date.now());
-    upsertAccount({ id: state.pendingSignupId, loginId: id, passwordHash, nickname: '', trustScore: TRUST_BASELINE });
+    upsertAccount({ id: state.pendingSignupId, loginId: email, passwordHash, nickname: '', trustScore: TRUST_BASELINE });
     localStorage.setItem(PRIVATE_PROFILE_KEY, JSON.stringify({
         userId: state.pendingSignupId,
         name: $('signup-name').value.trim(),
         gender: $('signup-gender').value,
-        age: Number($('signup-age').value),
-        ageGroup: ageGroupFromAge($('signup-age').value),
+        age,
+        ageGroup: ageGroupFromAge(age),
         phone: $('signup-phone').value.trim(),
-        signupId: id,
-        verificationMethod: $('signup-verification-method').value,
+        email,
         marketingConsent: $('signup-marketing-consent').checked
     }));
     closeSignup();
@@ -1042,11 +999,11 @@ async function login(event) {
     event.preventDefault();
     const loginId = normalizeLoginId($('input-login-id').value);
     const password = $('input-login-password').value;
-    if (!/^[a-z0-9][a-z0-9_-]{3,23}$/.test(loginId)) return setLoginStatus('아이디를 올바르게 입력해 주세요.', 'warning', 'input-login-id');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginId)) return setLoginStatus('이메일 주소를 올바르게 입력해 주세요.', 'warning', 'input-login-id');
     if (!password) return setLoginStatus('비밀번호를 입력해 주세요.', 'warning', 'input-login-password');
     if (!$('login-consent').checked) return setLoginStatus('커뮤니티 안전 규칙과 개인정보 최소 이용 안내를 확인해 주세요.', 'warning', 'login-consent');
     const account = getAccounts().find((item) => normalizeLoginId(item.loginId) === loginId);
-    if (!account) return setLoginStatus('가입된 아이디를 찾을 수 없습니다. 먼저 회원가입을 완료해 주세요.', 'warning', 'input-login-id');
+    if (!account) return setLoginStatus('가입된 이메일을 찾을 수 없습니다. 먼저 회원가입을 완료해 주세요.', 'warning', 'input-login-id');
     if (!account.nickname) return setLoginStatus('회원가입 후 공개 닉네임 설정을 완료해 주세요.', 'warning', 'input-login-id');
     let passwordHash;
     try {
@@ -1054,13 +1011,14 @@ async function login(event) {
     } catch {
         return setLoginStatus('비밀번호를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.', 'warning', 'input-login-password');
     }
-    if (passwordHash !== account.passwordHash) return setLoginStatus('아이디 또는 비밀번호가 올바르지 않습니다.', 'warning', 'input-login-password');
+    if (passwordHash !== account.passwordHash) return setLoginStatus('이메일 또는 비밀번호가 올바르지 않습니다.', 'warning', 'input-login-password');
     state.user = publicUser({ id: account.id, nickname: account.nickname, icon: '🌱', trustScore: account.trustScore });
     state.filters.ageGroup = 'all';
     localStorage.setItem(USER_KEY, JSON.stringify(state.user));
     closeLogin(); updateNav();
     setView('activities', false);
     setStatus('닉네임으로 로그인되었습니다. 참여할 활동을 찾아보세요.', 'success');
+    if (!getUserLocationSettings(state.user.id)) openLocationSetup();
 }
 
 function logout() {
@@ -1198,39 +1156,71 @@ function submitFeedback(event) {
     closeFeedback(); setStatus('행동 기반 평가가 제출되었습니다.', 'success');
 }
 
-function appendChatMessage(role, message) {
-    const node = createText('div', message, `chat-message ${role}`);
-    elements.chatMessages.append(node);
-    elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
+function getUserLocationSettings(userId) {
+    const stored = safeJson(localStorage.getItem(LOCATION_KEY), null);
+    return stored && stored.userId === String(userId) ? stored : null;
 }
 
-function chatbotReply(question) {
-    const normalized = normalizeSafetyText(question);
-    if (/안전|신고|개인정보|성비/.test(normalized)) return '모임은 공개된 장소에서 진행하고, 참여자의 실명·성별·나이·성비는 공개하지 않아요. 불편한 활동은 카드의 신고 버튼으로 알려주세요.';
-    if (/회원가입|가입|로그인/.test(normalized)) return '회원가입에는 기본 정보와 본인인증이 필요하며, 가입이 끝나면 공개 닉네임을 설정해요. 로그인 후에는 마이페이지에서 닉네임을 바꿀 수 있어요.';
-    if (/참여|최소|인원/.test(normalized)) return '모임은 최소 3명부터 운영돼요. 모집 인원이 부족하면 시작 전에 취소될 수 있고, 전 연령 참여 가능 방과 연령대 중심 방을 구분해 볼 수 있어요.';
-    const matches = state.groups.filter((group) => group.status === 'recruiting' && normalizeSafetyText(`${group.title} ${group.purpose} ${group.category}`).includes(normalized)).slice(0, 2);
-    if (matches.length) return `관련 모집방을 찾았어요: ${matches.map((group) => group.title).join(', ')}. 화면의 참여 신청하기 버튼에서 확인해 보세요.`;
-    return '검색창에 산책·러닝·독서·스터디처럼 관심사를 입력해 보세요. 원하는 모임이 없으면 로그인 후 모임을 개설할 수 있어요.';
+function saveUserLocationSettings(userId, settings) {
+    localStorage.setItem(LOCATION_KEY, JSON.stringify({ userId: String(userId), ...settings, updatedAt: new Date().toISOString() }));
 }
 
-function openChatbot() {
-    elements.chatModal.classList.remove('hidden');
-    elements.chatInput.focus();
+function requestBrowserGeolocation() {
+    return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) return reject(new Error('unsupported'));
+        navigator.geolocation.getCurrentPosition(
+            (position) => resolve({ lat: position.coords.latitude, lng: position.coords.longitude }),
+            () => reject(new Error('denied')),
+            { timeout: 8000 }
+        );
+    });
 }
 
-function closeChatbot() {
-    elements.chatModal.classList.add('hidden');
+function toggleLocationModeFields() {
+    elements.locationManualGroup.classList.toggle('hidden', elements.locationModeSelect.value !== 'manual');
 }
 
-function handleChatbot(event) {
+function openLocationSetup() {
+    if (!state.user) return;
+    const existing = getUserLocationSettings(state.user.id);
+    $('input-location-date').value = existing?.referenceDate || new Date().toISOString().slice(0, 10);
+    elements.locationModeSelect.value = existing?.locationMode || 'auto';
+    $('input-location-label').value = existing?.label || '';
+    toggleLocationModeFields();
+    if (elements.locationSetupStatus) { elements.locationSetupStatus.textContent = ''; elements.locationSetupStatus.dataset.tone = ''; }
+    elements.locationSetupModal.classList.remove('hidden');
+}
+
+function closeLocationSetup() {
+    elements.locationSetupModal.classList.add('hidden');
+}
+
+async function submitLocationSetup(event) {
     event.preventDefault();
-    const guard = guardRecommendationInput(elements.chatInput.value);
-    if (!guard.ok) return appendChatMessage('assistant', guard.message);
-    const question = guard.value;
-    appendChatMessage('user', question);
-    appendChatMessage('assistant', chatbotReply(question));
-    elements.chatInput.value = '';
+    if (!state.user) return closeLocationSetup();
+    const referenceDate = $('input-location-date').value;
+    if (!referenceDate) { elements.locationSetupStatus.textContent = '기준 날짜를 선택해 주세요.'; elements.locationSetupStatus.dataset.tone = 'warning'; return; }
+    const locationMode = elements.locationModeSelect.value;
+    if (locationMode === 'manual') {
+        const label = $('input-location-label').value.trim();
+        if (!label) { elements.locationSetupStatus.textContent = '참고할 위치를 입력해 주세요.'; elements.locationSetupStatus.dataset.tone = 'warning'; return; }
+        saveUserLocationSettings(state.user.id, { referenceDate, locationMode, label, lat: null, lng: null });
+        closeLocationSetup();
+        setStatus('참여 조건이 저장되었습니다.', 'success');
+        return;
+    }
+    elements.locationSetupStatus.textContent = '위치 정보를 확인하고 있어요...';
+    elements.locationSetupStatus.dataset.tone = '';
+    try {
+        const { lat, lng } = await requestBrowserGeolocation();
+        saveUserLocationSettings(state.user.id, { referenceDate, locationMode: 'auto', label: null, lat, lng });
+        closeLocationSetup();
+        setStatus('참여 조건이 저장되었습니다.', 'success');
+    } catch {
+        saveUserLocationSettings(state.user.id, { referenceDate, locationMode: 'auto', label: null, lat: null, lng: null });
+        elements.locationSetupStatus.textContent = '위치 권한을 확인할 수 없어 날짜만 저장했습니다. 브라우저 위치 권한을 허용하거나 위치를 직접 지정해 주세요.';
+        elements.locationSetupStatus.dataset.tone = 'warning';
+    }
 }
 
 function cancelUnderfilledGroups() {
@@ -1295,7 +1285,7 @@ function init() {
     }
     if (state.user && getPrivateProfile()?.userId === state.user.id) state.filters.ageGroup = 'mine';
     persistence.load(); loadPosts(); loadNotifications(); renderCategoryOptions(); migrateCurrentUserAccount(state.user); updateNav(); renderGroups(); renderBoard(); cancelUnderfilledGroups(); setView(viewFromLocation(), false, false);
-    elements.profileButton.addEventListener('click', openProfile); elements.closeProfile.addEventListener('click', closeProfile); elements.profileForm.addEventListener('submit', submitProfile); elements.notificationsButton.addEventListener('click', openNotifications); elements.closeNotifications.addEventListener('click', closeNotifications); $('btn-check-id').addEventListener('click', checkSignupId); $('signup-id').addEventListener('input', () => { signupState.idAvailable = false; signupState.idCheckedId = ''; $('signup-id').dataset.checkedId = ''; $('signup-id').dataset.idAvailable = 'false'; $('signup-id-status').textContent = '아이디가 변경되었습니다. 다시 중복 확인해 주세요.'; $('signup-id-status').dataset.tone = 'info'; }); $('signup-age').addEventListener('input', enforceSignupAge); $('btn-send-verification').addEventListener('click', sendSignupVerification); $('signup-verification-contact').addEventListener('input', resetSignupVerification); $('signup-verification-method').addEventListener('change', resetSignupVerification); $('btn-complete-verification').addEventListener('click', completeSignupVerification); elements.logout.addEventListener('click', logout);
+    elements.profileButton.addEventListener('click', openProfile); elements.closeProfile.addEventListener('click', closeProfile); elements.profileForm.addEventListener('submit', submitProfile); elements.notificationsButton.addEventListener('click', openNotifications); elements.closeNotifications.addEventListener('click', closeNotifications); $('signup-age').addEventListener('input', enforceSignupAge); elements.logout.addEventListener('click', logout);
     elements.create.addEventListener('click', openCreate); elements.closeCreate.addEventListener('click', closeCreate);
     elements.form.addEventListener('submit', handleCreate);
     elements.closeFeedback.addEventListener('click', closeFeedback);
@@ -1306,7 +1296,7 @@ function init() {
     elements.createMain.addEventListener('click', openCreate);
     elements.createGuide.addEventListener('click', openCreate);
     elements.navCreate.addEventListener('click', openCreate);
-    elements.openChat.addEventListener('click', openChatbot); elements.closeChat.addEventListener('click', closeChatbot); elements.chatForm.addEventListener('submit', handleChatbot);
+    elements.closeLocationSetup.addEventListener('click', closeLocationSetup); elements.locationSetupForm.addEventListener('submit', submitLocationSetup); elements.locationModeSelect.addEventListener('change', toggleLocationModeFields); elements.openLocationSetup.addEventListener('click', () => { closeProfile(); openLocationSetup(); });
     window.addEventListener('hashchange', () => setView(viewFromLocation(), true, false));
     window.addEventListener('popstate', () => setView(viewFromLocation(), true, false));
     window.addEventListener('storage', (event) => { if (event.key === GROUPS_KEY) { persistence.load(); renderGroups(); } if (event.key === NOTIFICATIONS_KEY) { loadNotifications(); renderNotifications(); } });
