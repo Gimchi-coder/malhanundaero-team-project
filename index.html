@@ -80,20 +80,24 @@
                     <button id="btn-apply-search" class="btn-outline search-button" type="button">검색</button>
                     <button id="btn-ai-recommendations" class="btn-outline ai-recommendations-button" type="button">✦ AI 추천 모임 보기</button>
                 </div>
-                <div class="location-quick-setting">
-                    <button id="btn-location-settings" class="btn-outline location-settings-button" type="button">📍 오늘 · 내 위치</button>
-                    <div id="location-settings-popover" class="location-settings-popover hidden" role="dialog" aria-label="참여 날짜와 위치 설정">
-                        <form id="form-location-settings" novalidate>
-                            <div class="form-group"><label for="input-location-date">참여를 생각하는 날짜</label><input type="date" id="input-location-date" required></div>
-                            <fieldset class="location-mode-fieldset"><label class="setting-choice-compact"><input type="radio" name="location-mode" value="current" checked> 나의 위치로 설정</label><label class="setting-choice-compact"><input type="radio" name="location-mode" value="manual"> 위치 직접 지정</label></fieldset>
-                            <div id="location-manual-field" class="form-group hidden"><input type="text" id="input-manual-location" maxlength="60" placeholder="예: 마포구, 합정역"></div>
-                            <div class="location-popover-actions"><button class="btn-primary btn-small" type="submit">저장</button></div>
-                            <p id="location-settings-status" class="form-submit-status" role="status" aria-live="polite"></p>
-                        </form>
-                    </div>
-                </div>
             </div>
 
+            <div class="location-quick-setting location-mini-card">
+                <button id="btn-location-settings" class="location-mini-button" type="button" aria-haspopup="dialog" aria-expanded="false">
+                    <span class="location-mini-icon" aria-hidden="true">⌖</span>
+                    <span class="location-mini-copy"><small>거리 기준</small><strong id="location-settings-label">오늘 · 내 위치</strong></span>
+                    <span class="location-mini-arrow" aria-hidden="true">›</span>
+                </button>
+                <div id="location-settings-popover" class="location-settings-popover hidden" role="dialog" aria-label="참여 날짜와 위치 설정">
+                    <form id="form-location-settings" novalidate>
+                        <div class="form-group"><label for="input-location-date">참여를 생각하는 날짜</label><input type="date" id="input-location-date" required></div>
+                        <fieldset class="location-mode-fieldset"><label class="setting-choice-compact"><input type="radio" name="location-mode" value="current" checked> 나의 위치로 설정</label><label class="setting-choice-compact"><input type="radio" name="location-mode" value="manual"> 위치 직접 지정</label></fieldset>
+                        <div id="location-manual-field" class="form-group hidden"><input type="text" id="input-manual-location" maxlength="60" placeholder="예: 마포구, 합정역"></div>
+                        <div class="location-popover-actions"><button class="btn-primary btn-small" type="submit">저장</button></div>
+                        <p id="location-settings-status" class="form-submit-status" role="status" aria-live="polite"></p>
+                    </form>
+                </div>
+            </div>
             <div class="filter-group">
                 <span class="filter-label">활동별</span><div id="category-filter-buttons" class="category-filter-buttons" aria-label="활동별 분류"></div>
             </div>
@@ -149,7 +153,18 @@
 
         <section id="guide" class="guide-strip">
             <div><p class="eyebrow">TRUST, NOT POPULARITY</p><h2>참여 온도와 활동 후 기록은 달라요.</h2><p>참여 온도는 시간 약속·배려와 매너·규칙 준수에 대한 행동 피드백만 반영합니다. 활동 후 느낌과 다시 참여할 의향은 (1) 나에게 맞는 연결 속도를 찾는 데 쓰이고, (2) 현재 모집 중인 활동을 근거로 AI 추천을 돕는 데 활용돼요.</p></div>
-            <div class="temperature-explainer"><div class="temperature-dimensions"><span>🕒 시간 약속</span><span>🤝 배려와 매너</span><span>✓ 규칙 준수</span></div><div class="temperature-legend"><span><i class="legend-dot trust-hot"></i>70°C 이상 · 안정적</span><span><i class="legend-dot trust-warm"></i>50~70°C · 기본 구간</span><span><i class="legend-dot trust-cool"></i>50°C 미만 · 불안정</span></div><button class="btn-outline guide-history-button" type="button" data-view-target="history">내 활동 기록 보기 →</button></div>
+            <div class="temperature-explainer"><div class="temperature-dimensions"><span>🕒 시간 약속</span><span>🤝 배려와 매너</span><span>✓ 규칙 준수</span></div><div class="temperature-legend"><div class="temp-face-card temp-face-hot"><span class="temp-face-emoji" aria-hidden="true">☀️</span><strong>70°C 이상</strong><span>따뜻해요! 안정적이에요</span></div><div class="temp-face-card temp-face-warm"><span class="temp-face-emoji" aria-hidden="true">🙂</span><strong>50~70°C</strong><span>보통이에요, 기본 구간</span></div><div class="temp-face-card temp-face-cool"><span class="temp-face-emoji" aria-hidden="true">🥶</span><strong>50°C 미만</strong><span>차가워요, 조금 더 확인해요</span></div></div><button class="btn-outline guide-history-button" type="button" data-view-target="history">내 활동 기록 보기 →</button></div>
+            <div class="feature-summary">
+                <p class="eyebrow feature-summary-eyebrow">주요 기능 요약</p>
+                <div class="feature-summary-grid">
+                    <div class="feature-item"><span class="feature-icon">👥</span><span>최소 3명 이상<br>모임만 성사</span></div>
+                    <div class="feature-item"><span class="feature-icon">🔒</span><span>성비 비공개<br>안전한 모임 운영</span></div>
+                    <div class="feature-item"><span class="feature-icon">✦</span><span>AI 추천<br>맞춤 모임 안내</span></div>
+                    <div class="feature-item"><span class="feature-icon">🗂️</span><span>다양한 카테고리<br>관심 모임</span></div>
+                    <div class="feature-item"><span class="feature-icon">🚩</span><span>신고 기능<br>안전한 커뮤니티</span></div>
+                    <div class="feature-item"><span class="feature-icon">🌡️</span><span>참여 온도<br>행동 기반 신뢰도</span></div>
+                </div>
+            </div>
         </section>
     </main>
 
