@@ -84,6 +84,14 @@ rejects duplicates/self-review, and updates the trust projection.
 - [x] T029 Verify no browser-delivered configuration contains a real provider secret and document the production boundary in `config.js` and `specs/001-dongne-gwangjang/quickstart.md`
 - [x] T030 Run all quickstart scenarios and record pass/fail evidence in `tests/validation.md`
 
+## Phase 10: Code-first automation replacement
+
+- [x] T050 Add a Vercel-compatible server endpoint with the existing automation input/output contract in api/automation.js
+- [x] T051 Add embedding-based activity document retrieval, cosine ranking, grounded recommendation generation, and candidate-ID validation in api/_lib/automation.js and api/_lib/provider.js
+- [x] T052 Add deterministic safety gates, context-classification prompts, confidence handling, and fail-closed provider behavior in api/_lib/automation.js and api/automation.js
+- [x] T053 Add automation mode switching, code-path documentation, and pure-function verification without exposing provider secrets in config.js, main.js, docs/code-automation.md, and tests/code-automation.mjs
+- [x] T054 Activate the Vercel code endpoint, add a semantic-vector fallback for restricted embedding credentials, and verify live safe, risky, and recommendation requests
+
 ## Dependencies & Execution Order
 
 - Setup (Phase 1) precedes all other phases.

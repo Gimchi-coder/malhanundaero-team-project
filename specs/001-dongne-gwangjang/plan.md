@@ -109,6 +109,12 @@ configured; it never contains a provider secret.
 
 ### AI safety design
 
+The code-first replacement lives in api/automation.js. Its recommendation branch performs
+embedding-based top-k retrieval before generation, while its safety branch performs deterministic
+gating before context classification. AUTOMATION_MODE selects n8n or the code endpoint without
+changing the browser contract. The current vector store is in-memory for MVP scope; Supabase
+pgvector is the scalable persistence option.
+
 The client-side fallback is intentionally conservative and deterministic for offline testing.
 The protected automation path may call an AI classifier that returns structured intent labels,
 confidence bands, and explanations. The client treats unavailable, malformed, low-confidence,

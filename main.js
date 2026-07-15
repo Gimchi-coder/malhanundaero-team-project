@@ -663,6 +663,11 @@ function chooseRecommendationRoute(interest) {
     return interest.length > 12 || /왜|상황|부담|조용|처음/.test(interest) ? 'protected-semantic' : 'local-fast';
 }
 
+function automationEndpoint(operation) {
+    if (CONFIG.AUTOMATION_MODE === 'code' && CONFIG.CODE_AUTOMATION_URL) return CONFIG.CODE_AUTOMATION_URL;
+    return operation === 'recommend' ? CONFIG.RECOMMENDATION_URL : CONFIG.SAFETY_REVIEW_URL;
+}
+
 async function requestAutomation(operation, payload, endpoint) {
     if (!endpoint) return null;
     const controller = new AbortController();
@@ -710,7 +715,8 @@ function validateSafetyResponse(result) {
 }
 
 async function safetyReview(activity) {
-    if (!CONFIG.SAFETY_REVIEW_URL) {
+    const endpoint = automationEndpoint('safety_review');
+    if (!endpoint) {
         await new Promise((resolve) => setTimeout(resolve, 450));
         return mockSafetyReview(activity);
     }
@@ -718,7 +724,7 @@ async function safetyReview(activity) {
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 8000);
     try {
-        const response = await fetch(CONFIG.SAFETY_REVIEW_URL, {
+        const response = await fetch(endpoint, {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: controller.signal,
             body: JSON.stringify({ operation: 'safety_review', requestId: crypto.randomUUID?.() || String(Date.now()), activity: { title: activity.title, purpose: activity.purpose, description: activity.description, location: activity.location, scheduledAt: activity.scheduledAt, maxParticipants: activity.maxParticipants } })
         });
@@ -1289,15 +1295,16 @@ async function getRecommendations(preferences) {
     cacheStats.misses += 1; localStorage.setItem(RECOMMENDATION_CACHE_STATS_KEY, JSON.stringify(cacheStats));
     const route = chooseRecommendationRoute(preferences.interest);
     let matches = null;
-    if (CONFIG.RECOMMENDATION_URL) {
+    const endpoint = automationEndpoint('recommend');
+    if (endpoint) {
         try {
-            const result = await requestAutomation('recommend', { preferences, activities: state.groups.filter((group) => group.status === 'recruiting').map((group) => ({ id: group.id, title: group.title, purpose: group.purpose, description: group.description, location: group.location, scheduledAt: group.scheduledAt, participants: group.participants, maxParticipants: group.maxParticipants, category: group.category, conversationLevel: group.conversationLevel, beginnerFriendly: group.beginnerFriendly, durationMinutes: group.durationMinutes })) }, CONFIG.RECOMMENDATION_URL);
-            if (Array.isArray(result?.recommendations)) matches = result.recommendations.map((item) => ({ activityId: item.activityId, fit: Number(item.fit) || 0, reason: String(item.reason || '') })).filter((item) => item.activityId && item.reason);
+            const result = await requestAutomation('recommend', { preferences, activities: state.groups.filter((group) => group.status === 'recruiting').map((group) => ({ id: group.id, title: group.title, purpose: group.purpose, description: group.description, location: group.location, scheduledAt: group.scheduledAt, participants: group.participants, maxParticipants: group.maxParticipants, category: group.category, conversationLevel: group.conversationLevel, beginnerFriendly: group.beginnerFriendly, durationMinutes: group.durationMinutes, status: group.status })) }, endpoint);
+            if (Array.isArray(result?.recommendations)) matches = result.recommendations.map((item) => ({ activityId: item.activityId, fit: Number(item.fit) || 0, reason: String(item.reason || ''), source: result.retrieval?.method || '' })).filter((item) => item.activityId && item.reason);
         } catch { matches = null; }
     }
     matches ||= localRecommendationMatches(preferences);
     cache[key] = matches; localStorage.setItem(RECOMMENDATION_CACHE_KEY, JSON.stringify(cache));
-    operationLog('recommend', matches.length ? 'success' : 'empty', startedAt, { policyVersion: CONFIG.RECOMMENDATION_URL ? 'recommendation-v1-protected' : `recommendation-v1-${route}` });
+    operationLog('recommend', matches.length ? 'success' : 'empty', startedAt, { policyVersion: endpoint ? 'recommendation-v1-protected' : 'recommendation-v1-' + route });
     return matches;
 }
 
@@ -1308,14 +1315,19 @@ function renderRecommendations(matches, preferences) {
         elements.recommendationStatus.dataset.tone = 'warning';
         return;
     }
-    elements.recommendationStatus.textContent = '현재 모집 중인 활동 정보와 입력한 조건을 비교해 추천했어요.';
+    elements.recommendationStatus.textContent = matches.some((match) => ['embedding-cosine', 'semantic-vector-cosine'].includes(match.source)) ? '활동 설명을 의미 벡터로 검색한 뒤, 조건에 맞는 연결을 추천했어요.' : '현재 모집 중인 활동 정보와 입력한 조건을 비교해 추천했어요.';
     elements.recommendationStatus.dataset.tone = 'success';
     matches.forEach((match) => {
         const group = state.groups.find((item) => item.id === match.activityId);
         if (!group) return;
         const card = document.createElement('article');
         card.className = 'recommendation-card';
-        card.append(createText('div', `${Math.round(match.fit * 100)}% 잘 맞아요`, 'fit-badge'), createText('h3', group.title), createText('p', match.reason, 'recommendation-reason'), createText('small', '근거: 현재 모집 중인 활동 정보와 입력한 조건', 'recommendation-source'), createText('span', `📍 ${group.location} · ${formatDate(group.scheduledAt)}`, 'card-meta'));
+        const source = match.source === 'embedding-cosine'
+            ? '근거: 활동 문서를 임베딩해 의미 유사도 검색'
+            : match.source === 'semantic-vector-cosine'
+                ? '근거: 활동 문서를 의미 축 벡터로 변환해 유사도 검색'
+                : '근거: 현재 모집 중인 활동 정보와 입력한 조건';
+        card.append(createText('div', `${Math.round(match.fit * 100)}% 잘 맞아요`, 'fit-badge'), createText('h3', group.title), createText('p', match.reason, 'recommendation-reason'), createText('small', source, 'recommendation-source'), createText('span', `📍 ${group.location} · ${formatDate(group.scheduledAt)}`, 'card-meta'));
         const view = document.createElement('button');
         view.type = 'button'; view.className = 'btn-outline btn-small'; view.textContent = '활동 보기';
         view.addEventListener('click', () => {
@@ -1331,7 +1343,7 @@ async function handleRecommendation(event) {
     const guard = guardRecommendationInput($('input-interest').value);
     if (!guard.ok) { elements.recommendationStatus.textContent = guard.message; elements.recommendationStatus.dataset.tone = 'warning'; return; }
     const preferences = { interest: guard.value, comfort: $('input-comfort').value, timeWindow: $('input-time-window').value };
-    elements.recommendationStatus.textContent = CONFIG.RECOMMENDATION_URL ? '보호된 추천 Agent가 활동 근거와 조건을 확인하고 있어요...' : '현재 모집 중인 활동 정보와 참여 조건을 비교하고 있어요...';
+    elements.recommendationStatus.textContent = automationEndpoint('recommend') ? '추천 RAG가 활동 근거와 조건을 확인하고 있어요...' : '현재 모집 중인 활동 정보와 참여 조건을 비교하고 있어요...';
     const matches = await getRecommendations(preferences);
     renderRecommendations(matches, preferences);
 }

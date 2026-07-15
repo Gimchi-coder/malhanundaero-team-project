@@ -70,6 +70,19 @@ Expected evidence: the 50-case safety set reports at least 45 unsafe cases as `h
 4. Replay a safe, direct prohibited, obfuscated, and classifier-failure input. Record the
    response decision, category, confidence, and failure path.
 
+### Code replacement replay
+
+1. Deploy the repository to Vercel so api/automation.js is exposed as a serverless endpoint.
+2. Add OPENAI_API_KEY to Vercel server environment variables. Never add it to config.js.
+3. Set AUTOMATION_MODE to code in config.js and redeploy.
+4. Replay the same safety_review and recommend JSON bodies against /api/automation.
+5. Confirm recommendation responses report embedding-cosine or semantic-vector-cosine retrieval
+   and safety failures return unavailable or manual_review without publishing.
+
+The code path is an MVP in-memory vector retrieval implementation. Supabase pgvector is the
+next persistence step if the activity knowledge base grows; it is not required to demonstrate
+the current RAG structure.
+
 ### Rubric evidence map
 
 | Rubric | Evidence |

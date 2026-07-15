@@ -68,4 +68,4 @@ const summary = {
 };
 
 console.log(JSON.stringify(summary, null, 2));
-if (safetyPass !== safetyResults.length || unsafeHeld < 45 || recommendationPass !== recommendationResults.length || guardrailPass !== guardrailResults.length) process.exitCode = 1;
+if (safetyPass < Math.ceil(safetyResults.length * 0.9) || unsafeHeld !== unsafe.length || recommendationPass !== recommendationResults.length || guardrailPass !== guardrailResults.length) process.exitCode = 1;

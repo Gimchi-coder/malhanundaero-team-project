@@ -1,0 +1,16 @@
+.git
+.vercel
+.agents
+.specify
+langfuse
+강의자료
+강의자료.zip
+docs
+specs
+n8n
+tests
+supabase
+*.md
+*.pdf
+*.ipynb
+*.zip

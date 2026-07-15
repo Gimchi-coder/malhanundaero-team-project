@@ -19,6 +19,14 @@
 검색된 활동의 식별자·추천 이유만 반환한다. 로컬에서는 브라우저의 결정적 grounded fallback을
 사용하며 실제 RAG 호출로 가장하지 않는다.
 
+## 순수 코드 대체 경로
+
+api/automation.js는 이 workflow와 같은 계약을 Vercel Function으로 재현한다. 추천은
+임베딩·코사인 유사도 top-k 검색 후 추천 Agent를 호출하고, 안전 검토는 규칙 게이트 후
+문맥 분류 Agent를 호출한다. config.js의 AUTOMATION_MODE를 code로 바꾸면
+/api/automation을 사용한다. n8n JSON은 루브릭의 시각적 workflow 증거와 재현용으로
+보존한다.
+
 ## 운영 규칙
 
 - provider credential은 n8n Credential store에만 둔다.

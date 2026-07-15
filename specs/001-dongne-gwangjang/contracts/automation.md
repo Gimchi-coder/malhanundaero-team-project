@@ -2,8 +2,9 @@
 
 ## Purpose
 
-This contract is the stable boundary between the browser, n8n, and a protected semantic AI
-provider. The browser must not depend on provider-specific response fields.
+This contract is the stable boundary between the browser, n8n or the code-based Vercel Function,
+and a protected semantic AI provider. The browser must not depend on provider-specific response
+fields.
 
 The current protected classifier implementation is the external
 `/Users/cw/Downloads/Censorship_Agent` gateway. It reads provider credentials only from its
@@ -83,3 +84,15 @@ HTTP failures, timeouts, invalid JSON, and schema mismatches produce `unavailabl
 or an empty recommendation with a retry message. The browser may use its labeled offline
 fallback only when the endpoint is not configured; it must never represent that fallback as a
 provider-backed decision.
+
+The code path additionally returns a privacy-safe retrieval summary for recommendation requests:
+
+    retrieval: {
+      method: "embedding-cosine | semantic-vector-cosine",
+      topK: 5,
+      fallback: false,
+      embeddingFallback: false
+    }
+
+This MVP performs vector retrieval in memory for the current activity set. Supabase pgvector can
+replace that storage boundary later without changing this response contract.
