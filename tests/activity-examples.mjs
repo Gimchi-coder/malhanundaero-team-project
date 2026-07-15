@@ -6,6 +6,8 @@ const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 
 const exampleSection = source.slice(source.indexOf('const ACTIVITY_EXAMPLES'), source.indexOf('function activityFamilyForType'));
 assert.doesNotMatch(exampleSection, /temperature:/);
+assert.match(html, /<details class="activity-examples-reference">/);
+assert.doesNotMatch(html, /<details class="activity-examples-reference" open>/);
 const families = [...exampleSection.matchAll(/family: '([^']+)'/g)].map((match) => match[1]);
 for (const family of ['study', 'hobby', 'sports', 'social', 'game', 'culture', 'community', 'project', 'other']) {
     assert.equal(families.filter((value) => value === family).length, 2, `${family} needs two example cards`);
