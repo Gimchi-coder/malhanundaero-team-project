@@ -18,7 +18,6 @@ const POSTS_KEY = 'dg_board_posts_v1';
 const OPERATIONS_KEY = 'dg_operations_v1';
 const RECOMMENDATION_CACHE_KEY = 'dg_recommendation_cache_v1';
 const RECOMMENDATION_CACHE_STATS_KEY = 'dg_recommendation_cache_stats_v1';
-const LOCATION_KEY = 'dg_user_location_v1';
 
 const state = {
     user: null,
@@ -95,13 +94,6 @@ elements.categoryList = $('category-list');
 elements.activityExamples = $('activity-examples');
 elements.signupSubmitStatus = $('signup-submit-status');
 elements.enterActivities = $('btn-enter-activities');
-elements.locationSetupModal = $('modal-location-setup');
-elements.closeLocationSetup = $('btn-close-location-setup');
-elements.locationSetupForm = $('form-location-setup');
-elements.locationSetupStatus = $('location-setup-status');
-elements.locationModeSelect = $('input-location-mode');
-elements.locationManualGroup = $('location-manual-group');
-elements.openLocationSetup = $('btn-open-location-setup');
 elements.recommendationDock = $('ai-recommendation');
 elements.viewTabs = [...document.querySelectorAll('[data-view-target]')];
 elements.navCreate = $('nav-create');
@@ -927,7 +919,6 @@ function submitNicknameSetup(event) {
     updateNav();
     setView('activities', false);
     setStatus('회원가입과 공개 닉네임 설정이 완료되어 자동 로그인되었습니다. 그룹 활동을 시작해 보세요.', 'success');
-    if (!getUserLocationSettings(state.user.id)) openLocationSetup();
 }
 
 function enforceSignupAge(event) {
@@ -1018,7 +1009,6 @@ async function login(event) {
     closeLogin(); updateNav();
     setView('activities', false);
     setStatus('닉네임으로 로그인되었습니다. 참여할 활동을 찾아보세요.', 'success');
-    if (!getUserLocationSettings(state.user.id)) openLocationSetup();
 }
 
 function logout() {
@@ -1156,73 +1146,6 @@ function submitFeedback(event) {
     closeFeedback(); setStatus('행동 기반 평가가 제출되었습니다.', 'success');
 }
 
-function getUserLocationSettings(userId) {
-    const stored = safeJson(localStorage.getItem(LOCATION_KEY), null);
-    return stored && stored.userId === String(userId) ? stored : null;
-}
-
-function saveUserLocationSettings(userId, settings) {
-    localStorage.setItem(LOCATION_KEY, JSON.stringify({ userId: String(userId), ...settings, updatedAt: new Date().toISOString() }));
-}
-
-function requestBrowserGeolocation() {
-    return new Promise((resolve, reject) => {
-        if (!navigator.geolocation) return reject(new Error('unsupported'));
-        navigator.geolocation.getCurrentPosition(
-            (position) => resolve({ lat: position.coords.latitude, lng: position.coords.longitude }),
-            () => reject(new Error('denied')),
-            { timeout: 8000 }
-        );
-    });
-}
-
-function toggleLocationModeFields() {
-    elements.locationManualGroup.classList.toggle('hidden', elements.locationModeSelect.value !== 'manual');
-}
-
-function openLocationSetup() {
-    if (!state.user) return;
-    const existing = getUserLocationSettings(state.user.id);
-    $('input-location-date').value = existing?.referenceDate || new Date().toISOString().slice(0, 10);
-    elements.locationModeSelect.value = existing?.locationMode || 'auto';
-    $('input-location-label').value = existing?.label || '';
-    toggleLocationModeFields();
-    if (elements.locationSetupStatus) { elements.locationSetupStatus.textContent = ''; elements.locationSetupStatus.dataset.tone = ''; }
-    elements.locationSetupModal.classList.remove('hidden');
-}
-
-function closeLocationSetup() {
-    elements.locationSetupModal.classList.add('hidden');
-}
-
-async function submitLocationSetup(event) {
-    event.preventDefault();
-    if (!state.user) return closeLocationSetup();
-    const referenceDate = $('input-location-date').value;
-    if (!referenceDate) { elements.locationSetupStatus.textContent = '기준 날짜를 선택해 주세요.'; elements.locationSetupStatus.dataset.tone = 'warning'; return; }
-    const locationMode = elements.locationModeSelect.value;
-    if (locationMode === 'manual') {
-        const label = $('input-location-label').value.trim();
-        if (!label) { elements.locationSetupStatus.textContent = '참고할 위치를 입력해 주세요.'; elements.locationSetupStatus.dataset.tone = 'warning'; return; }
-        saveUserLocationSettings(state.user.id, { referenceDate, locationMode, label, lat: null, lng: null });
-        closeLocationSetup();
-        setStatus('참여 조건이 저장되었습니다.', 'success');
-        return;
-    }
-    elements.locationSetupStatus.textContent = '위치 정보를 확인하고 있어요...';
-    elements.locationSetupStatus.dataset.tone = '';
-    try {
-        const { lat, lng } = await requestBrowserGeolocation();
-        saveUserLocationSettings(state.user.id, { referenceDate, locationMode: 'auto', label: null, lat, lng });
-        closeLocationSetup();
-        setStatus('참여 조건이 저장되었습니다.', 'success');
-    } catch {
-        saveUserLocationSettings(state.user.id, { referenceDate, locationMode: 'auto', label: null, lat: null, lng: null });
-        elements.locationSetupStatus.textContent = '위치 권한을 확인할 수 없어 날짜만 저장했습니다. 브라우저 위치 권한을 허용하거나 위치를 직접 지정해 주세요.';
-        elements.locationSetupStatus.dataset.tone = 'warning';
-    }
-}
-
 function cancelUnderfilledGroups() {
     const now = Date.now(); let changed = false;
     state.groups.forEach((group) => {
@@ -1296,7 +1219,6 @@ function init() {
     elements.createMain.addEventListener('click', openCreate);
     elements.createGuide.addEventListener('click', openCreate);
     elements.navCreate.addEventListener('click', openCreate);
-    elements.closeLocationSetup.addEventListener('click', closeLocationSetup); elements.locationSetupForm.addEventListener('submit', submitLocationSetup); elements.locationModeSelect.addEventListener('change', toggleLocationModeFields); elements.openLocationSetup.addEventListener('click', () => { closeProfile(); openLocationSetup(); });
     window.addEventListener('hashchange', () => setView(viewFromLocation(), true, false));
     window.addEventListener('popstate', () => setView(viewFromLocation(), true, false));
     window.addEventListener('storage', (event) => { if (event.key === GROUPS_KEY) { persistence.load(); renderGroups(); } if (event.key === NOTIFICATIONS_KEY) { loadNotifications(); renderNotifications(); } });
