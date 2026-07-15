@@ -116,6 +116,13 @@ elements.search = $('input-group-search');
 elements.applySearch = $('btn-apply-search');
 elements.createMain = $('btn-create-main');
 elements.recommendationHero = $('btn-recommendation-hero');
+elements.locationSettingsButton = $('btn-location-settings');
+elements.locationSettingsPopover = $('location-settings-popover');
+elements.locationSettingsForm = $('form-location-settings');
+elements.locationSettingsStatus = $('location-settings-status');
+elements.locationSettingsDate = $('input-location-date');
+elements.locationManualField = $('location-manual-field');
+elements.locationManualLocation = $('input-manual-location');
 elements.ageFilters = $('age-filter-buttons');
 elements.categoryFilters = $('category-filter-buttons');
 elements.groupCount = $('group-count');
@@ -247,6 +254,92 @@ function sortGroupsForActivitySettings(groups) {
         if (distanceDifference) return distanceDifference;
         return leftTime - rightTime;
     });
+}
+
+function requestCurrentCoordinates() {
+    return new Promise((resolve) => {
+        if (!navigator.geolocation) return resolve(null);
+        let settled = false;
+        const finish = (value) => {
+            if (settled) return;
+            settled = true;
+            resolve(value);
+        };
+        const timeout = window.setTimeout(() => finish(null), 8_000);
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                window.clearTimeout(timeout);
+                finish({ latitude: position.coords.latitude, longitude: position.coords.longitude });
+            },
+            () => {
+                window.clearTimeout(timeout);
+                finish(null);
+            },
+            { enableHighAccuracy: false, maximumAge: 15 * 60 * 1000, timeout: 7_000 }
+        );
+    });
+}
+
+function setLocationSettingsStatus(message = '', tone = '') {
+    if (!elements.locationSettingsStatus) return;
+    elements.locationSettingsStatus.textContent = message;
+    elements.locationSettingsStatus.dataset.tone = tone;
+}
+
+function toggleLocationManualField(mode) {
+    elements.locationManualField?.classList.toggle('hidden', mode !== 'manual');
+}
+
+function locationSettingsButtonLabel(settings) {
+    const dateLabel = settings.preferredDate === localDateInputValue() ? '오늘' : `${Number(settings.preferredDate.slice(5, 7))}/${Number(settings.preferredDate.slice(8, 10))}`;
+    const placeLabel = settings.locationMode === 'manual' && settings.manualLocation ? settings.manualLocation : '내 위치';
+    return `📍 ${dateLabel} · ${placeLabel}`;
+}
+
+function updateLocationSettingsButton() {
+    if (!elements.locationSettingsButton) return;
+    const settings = state.user ? (state.activitySettings || getActivitySettings()) : defaultActivitySettings();
+    elements.locationSettingsButton.textContent = locationSettingsButtonLabel(settings);
+}
+
+function openLocationSettingsPopover() {
+    if (!state.user) return openLogin();
+    const settings = normalizeActivitySettings(state.activitySettings || getActivitySettings());
+    elements.locationSettingsDate.value = settings.preferredDate;
+    const modeInput = document.querySelector(`input[name="location-mode"][value="${settings.locationMode}"]`);
+    if (modeInput) modeInput.checked = true;
+    elements.locationManualLocation.value = settings.manualLocation;
+    toggleLocationManualField(settings.locationMode);
+    setLocationSettingsStatus();
+    elements.locationSettingsPopover.classList.remove('hidden');
+}
+
+function closeLocationSettingsPopover() {
+    elements.locationSettingsPopover?.classList.add('hidden');
+}
+
+function toggleLocationSettingsPopover() {
+    if (elements.locationSettingsPopover.classList.contains('hidden')) openLocationSettingsPopover();
+    else closeLocationSettingsPopover();
+}
+
+async function submitLocationSettings(event) {
+    event.preventDefault();
+    if (!state.user) return openLogin();
+    const preferredDate = elements.locationSettingsDate.value;
+    if (!preferredDate) return setLocationSettingsStatus('참여를 생각하는 날짜를 선택해 주세요.', 'warning');
+    const locationMode = document.querySelector('input[name="location-mode"]:checked')?.value === 'manual' ? 'manual' : 'current';
+    const manualLocation = elements.locationManualLocation.value.trim();
+    if (locationMode === 'manual' && !manualLocation) return setLocationSettingsStatus('동네나 가까운 역 이름을 입력해 주세요.', 'warning');
+    if (locationMode === 'manual' && /자택|우리\s*집|개인\s*주소|아파트|동호수/i.test(manualLocation)) return setLocationSettingsStatus('집 주소 대신 동네나 가까운 역 이름으로 설정해 주세요.', 'warning');
+    setLocationSettingsStatus(locationMode === 'current' ? '현재 위치를 확인하고 있어요…' : '저장하고 있어요…', 'info');
+    const coordinates = locationMode === 'current' ? await requestCurrentCoordinates() : locationHintCoordinates(manualLocation);
+    state.activitySettings = normalizeActivitySettings({ preferredDate, locationMode, manualLocation, coordinates });
+    saveActivitySettings(state.activitySettings);
+    updateLocationSettingsButton();
+    renderGroups();
+    closeLocationSettingsPopover();
+    setStatus('참여 날짜·위치 설정을 저장했어요.', 'success');
 }
 
 function emptyActivityHistory() {
@@ -1825,6 +1918,7 @@ function updateNav() {
         elements.trustScore.classList.remove('trust-hot', 'trust-warm', 'trust-cool');
         elements.trustScore.classList.add(trustScoreClass(state.user.trustScore));
     }
+    updateLocationSettingsButton();
     renderNotifications();
 }
 
@@ -2698,6 +2792,15 @@ function init() {
     elements.reportForm.addEventListener('submit', submitReport);
     elements.recommendationForm.addEventListener('submit', handleRecommendation);
     elements.search.addEventListener('input', (event) => { state.filters.query = event.target.value; renderGroups(); });
+    updateLocationSettingsButton();
+    elements.locationSettingsButton.addEventListener('click', toggleLocationSettingsPopover);
+    elements.locationSettingsForm.addEventListener('submit', submitLocationSettings);
+    document.querySelectorAll('input[name="location-mode"]').forEach((input) => input.addEventListener('change', () => toggleLocationManualField(input.value)));
+    document.addEventListener('click', (event) => {
+        if (elements.locationSettingsPopover.classList.contains('hidden')) return;
+        if (event.target.closest('.location-quick-setting')) return;
+        closeLocationSettingsPopover();
+    });
     window.addEventListener('hashchange', () => setView(viewFromLocation(), true, false));
     window.addEventListener('popstate', () => setView(viewFromLocation(), true, false));
     window.addEventListener('storage', (event) => { if (event.key === GROUPS_KEY) { persistence.load(); renderGroups(); } if (event.key === NOTIFICATIONS_KEY) { loadNotifications(); renderNotifications(); } if (event.key === ACTIVITY_CHAT_KEY && elements.activityRoomModal.dataset.groupId) renderActivityRoomChat(elements.activityRoomModal.dataset.groupId); });

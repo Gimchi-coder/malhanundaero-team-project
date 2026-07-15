@@ -82,6 +82,18 @@
                     <button id="btn-apply-search" class="btn-outline search-button" type="button">검색</button>
                     <button id="btn-ai-recommendations" class="btn-outline ai-recommendations-button" type="button">✦ AI 추천 모임 보기</button>
                 </div>
+                <div class="location-quick-setting">
+                    <button id="btn-location-settings" class="btn-outline location-settings-button" type="button">📍 오늘 · 내 위치</button>
+                    <div id="location-settings-popover" class="location-settings-popover hidden" role="dialog" aria-label="참여 날짜와 위치 설정">
+                        <form id="form-location-settings" novalidate>
+                            <div class="form-group"><label for="input-location-date">참여를 생각하는 날짜</label><input type="date" id="input-location-date" required></div>
+                            <fieldset class="location-mode-fieldset"><label class="setting-choice-compact"><input type="radio" name="location-mode" value="current" checked> 나의 위치로 설정</label><label class="setting-choice-compact"><input type="radio" name="location-mode" value="manual"> 위치 직접 지정</label></fieldset>
+                            <div id="location-manual-field" class="form-group hidden"><input type="text" id="input-manual-location" maxlength="60" placeholder="예: 마포구, 합정역"></div>
+                            <div class="location-popover-actions"><button class="btn-primary btn-small" type="submit">저장</button></div>
+                            <p id="location-settings-status" class="form-submit-status" role="status" aria-live="polite"></p>
+                        </form>
+                    </div>
+                </div>
                 <button id="btn-create-main" class="btn-primary create-main-button" type="button">＋ 모임 만들기</button>
             </div>
 
