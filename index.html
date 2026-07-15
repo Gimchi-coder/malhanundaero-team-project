@@ -3,20 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="프로필과 부담 없이 안전하게 시작하는 동네 모임 서비스">
-    <title>동네 광장 | 함께 시작하는 우리 동네</title>
+    <meta name="description" content="외롭지만 먼저 다가가기 어려운 사람을 위한 작은 동네 연결">
+    <title>동네 광장 | 작은 연결을 시작해요</title>
     <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body data-view="home">
     <nav class="navbar">
-        <a class="brand" href="#top" aria-label="동네 광장 홈">
+        <a class="brand" href="#top" data-view-target="home" aria-label="동네 광장 홈">
             <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M7 8.5 12 12l5-3.5M12 12v5"/><circle cx="7" cy="7" r="2.5"/><circle cx="17" cy="7" r="2.5"/><circle cx="12" cy="18" r="2.5"/></svg></span>
             <span><strong>동네 광장</strong><small>가볍게 만나고, 오래 이어지는</small></span>
         </a>
         <div class="nav-links" aria-label="주요 메뉴">
-            <a href="#activities">모임 찾기</a>
-            <a href="#board">게시판</a>
-            <a href="#guide">이용 안내</a>
+            <button class="nav-tab active" type="button" data-view-target="home">홈</button>
+            <button class="nav-tab" type="button" data-view-target="activities">활동 찾기</button>
+            <button class="nav-tab" type="button" data-view-target="recommendation">AI 추천</button>
+            <button class="nav-tab" type="button" data-view-target="board">게시판</button>
+            <button class="nav-tab" type="button" data-view-target="guide">이용 안내</button>
+            <button class="nav-tab nav-create-tab" id="nav-create" type="button">모임 만들기</button>
         </div>
         <div class="nav-actions">
             <button id="btn-login" class="btn-ghost" type="button">로그인</button>
@@ -36,26 +39,41 @@
     <main id="top" class="page-shell">
         <section class="hero-section">
             <div class="hero-copy">
-                <p class="eyebrow">혼자 버티는 하루에서, 함께하는 작은 시작으로</p>
-                <h1>우리 동네에서<br><em>가볍게</em> 시작해요.</h1>
-                <p class="hero-description">사진과 스펙을 내려놓고, 공개된 장소에서 네 명 이상의 이웃과 목적이 있는 활동을 함께해요.</p>
+                <p class="eyebrow">사람과 연결되고 싶지만, 부담은 덜고 싶을 때</p>
+                <h1>혼자 있는 시간에서<br><em>작은 연결</em>로 나아가요.</h1>
+                <p class="hero-description">혼자 지내는 시간이 길어졌거나, 새로운 만남이 조심스러운 분들을 위한 서비스입니다. 외로움을 다그치지 않고, 관심 있는 활동 하나로 자연스럽게 이웃과 다시 연결되도록 돕습니다.</p>
                 <div class="hero-actions">
-                    <a class="btn-primary" href="#activities">모임 둘러보기</a>
-                    <button id="btn-create-hero" class="btn-ghost" type="button">내 모임 만들기 <span>→</span></button>
+                    <button id="btn-enter-activities" class="btn-primary" type="button" data-view-target="activities">활동 찾기 시작하기</button>
+                    <button id="btn-recommendation-hero" class="btn-ghost" type="button" data-view-target="recommendation">AI 맞춤 추천받기 <span>→</span></button>
                 </div>
+                <p class="hero-login-note">로그인 없이 활동을 둘러보고, 참여할 때 로그인할 수 있어요.</p>
             </div>
             <div class="hero-card">
-                <div class="hero-card-top"><span class="status-dot"></span><span>동네 광장의 약속</span></div>
-                <h2>사람보다<br><strong>활동</strong>에 집중해요.</h2>
+                <div class="hero-card-top"><span class="status-dot"></span><span>오늘의 작은 연결</span></div>
+                <h2>활동을 사이에 두고<br><strong>내 속도로 만나요.</strong></h2>
                 <div class="hero-principles">
-                    <span>✓ 공개된 장소</span><span>✓ 3~6명 소그룹</span><span>✓ 무프로필 참여</span><span>✓ 행동 기반 온도</span>
+                    <span>✓ 3명부터</span><span>✓ 활동에 집중</span><span>✓ 공개된 장소</span><span>✓ 무프로필 참여</span>
                 </div>
             </div>
         </section>
 
+        <details id="ai-recommendation" class="ai-dock core-ai-dock">
+            <summary><span class="ai-dock-icon">✦</span><span><strong>AI가 지금 참여할 수 있는 활동을 찾아드려요</strong><small>관심사와 편안한 참여 방식을 현재 모집 중인 활동 정보와 비교합니다.</small></span><b>맞춤 찾기 ⌄</b></summary>
+            <div class="ai-dock-body">
+                <form id="form-recommendation" class="recommendation-form">
+                    <div class="form-group"><label for="input-interest">관심 있는 활동</label><input type="text" id="input-interest" placeholder="예: 산책, 독서, 가벼운 운동"></div>
+                    <div class="form-group"><label for="input-comfort">편안한 참여 방식</label><select id="input-comfort"><option value="any">어떤 방식이든 괜찮아요</option><option value="quiet">말없이 각자 시간을 보내고 싶어요</option><option value="light_conversation">가벼운 대화를 나누고 싶어요</option><option value="active">함께 움직이는 활동이 좋아요</option></select></div>
+                    <div class="form-group"><label for="input-time-window">참여 시기</label><select id="input-time-window"><option value="any">언제든 좋아요</option><option value="today">오늘</option><option value="this_week">이번 주</option></select></div>
+                    <button class="btn-primary" type="submit">활동 근거로 추천받기</button>
+                </form>
+                <div id="recommendation-status" class="global-status" role="status" aria-live="polite"></div>
+                <div id="recommendation-list" class="recommendation-list" aria-live="polite"></div>
+            </div>
+        </details>
+
         <section id="activities" class="section-block">
             <div class="section-heading">
-                <div><p class="eyebrow">TODAY IN YOUR NEIGHBORHOOD</p><h2>모임 찾기</h2><p>관심 있는 활동과 연령대를 골라 지금 열려 있는 모임을 찾아보세요.</p></div>
+                <div><p class="eyebrow">CORE MVP · FIND → JOIN → CONNECT</p><h2>지금 참여할 수 있는 활동</h2><p>AI 추천을 받거나 활동별 필터로 직접 찾고, 마음에 드는 모임에 참여해 보세요.</p></div>
                 <span id="group-count" class="count-pill">0개 모집 중</span>
             </div>
 
@@ -73,6 +91,11 @@
             <div class="filter-group">
                 <span class="filter-label">연령대</span><div id="age-filter-buttons" class="age-filter-buttons" aria-label="연령대별 모집방"></div>
             </div>
+            <details class="activity-examples-reference">
+                <summary><strong>어떤 활동이 있나요?</strong><span>전체 예시 보기 ＋</span></summary>
+                <p>관심 있는 예시를 누르면 해당 활동을 바로 찾아볼 수 있어요.</p>
+                <div id="activity-examples" class="category-list"></div>
+            </details>
             <p class="privacy-note">🔒 참여자의 성별·나이·성비는 공개하지 않아요. 전 연령 모집방은 누구나 참여할 수 있어요.</p>
 
             <div id="global-status" class="global-status" role="status" aria-live="polite"></div>
@@ -80,23 +103,9 @@
             <p id="empty-state" class="empty-state hidden">조건에 맞는 모집방이 없어요.</p>
         </section>
 
-        <details class="ai-dock">
-            <summary><span class="ai-dock-icon">✦</span><span><strong>AI 안심 추천</strong><small>관심사와 편안한 만남을 알려주면 맞춤 모집방을 찾아드려요.</small></span><b>펼치기 ⌄</b></summary>
-            <div class="ai-dock-body">
-                <form id="form-recommendation" class="recommendation-form">
-                    <div class="form-group"><label for="input-interest">관심 있는 활동</label><input type="text" id="input-interest" placeholder="예: 산책, 독서, 가벼운 운동"></div>
-                    <div class="form-group"><label for="input-comfort">편안한 만남</label><select id="input-comfort"><option value="any">어떤 방식이든 괜찮아요</option><option value="quiet">말없이 각자 시간을 보내고 싶어요</option><option value="light_conversation">가벼운 대화를 나누고 싶어요</option><option value="active">함께 움직이는 활동이 좋아요</option></select></div>
-                    <div class="form-group"><label for="input-time-window">참여 시기</label><select id="input-time-window"><option value="any">언제든 좋아요</option><option value="today">오늘</option><option value="this_week">이번 주</option></select></div>
-                    <button class="btn-primary" type="submit">맞춤 추천 받기</button>
-                </form>
-                <div id="recommendation-status" class="global-status" role="status" aria-live="polite"></div>
-                <div id="recommendation-list" class="recommendation-list" aria-live="polite"></div>
-            </div>
-        </details>
-
         <section id="board" class="lower-grid section-block">
             <div class="board-panel">
-                <div class="section-heading compact"><div><p class="eyebrow">COMMUNITY BOARD</p><h2>전체 게시판</h2><p>모임을 시작하기 전, 이웃들의 이야기를 둘러보세요.</p></div><span class="section-symbol">↗</span></div>
+                <div class="section-heading compact"><div><p class="eyebrow">OPTIONAL · COMMUNITY BOARD</p><h2>모임 전 참고 게시판</h2><p>활동 참여가 먼저이고, 게시판은 필요할 때 참고해 보세요.</p></div><span class="section-symbol">↗</span></div>
                 <div id="board-list" class="board-list"></div>
                 <p id="board-empty" class="empty-state hidden">검색 조건에 맞는 게시글이 없어요.</p>
             </div>
@@ -111,41 +120,40 @@
         </section>
 
         <section id="guide" class="guide-strip">
-            <div><p class="eyebrow">SAFE BY DESIGN</p><h2>처음이어도 괜찮아요.</h2><p>공개된 장소, 3명 이상의 소그룹, 행동 기반 참여 온도로 편안한 시작을 돕습니다.</p></div>
-            <div class="temperature-legend"><span><i class="legend-dot trust-hot"></i>70°C 이상</span><span><i class="legend-dot trust-warm"></i>50~70°C</span><span><i class="legend-dot trust-cool"></i>50°C 미만</span></div>
+            <div><p class="eyebrow">TRUST, NOT POPULARITY</p><h2>참여 온도는 인기 점수가 아니에요.</h2><p>모임이 끝난 뒤 시간 약속·배려와 매너·규칙 준수에 대한 행동 피드백만 반영합니다. 기본 50°C에서 시작해 0~100°C 범위로 표시돼요.</p></div>
+            <div class="temperature-explainer"><div class="temperature-dimensions"><span>🕒 시간 약속</span><span>🤝 배려와 매너</span><span>✓ 규칙 준수</span></div><div class="temperature-legend"><span><i class="legend-dot trust-hot"></i>70°C 이상 · 안정적</span><span><i class="legend-dot trust-warm"></i>50~70°C · 기본 구간</span><span><i class="legend-dot trust-cool"></i>50°C 미만 · 함께 확인</span></div></div>
         </section>
     </main>
 
     <footer class="site-footer"><div><a class="brand footer-brand" href="#top"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M7 8.5 12 12l5-3.5M12 12v5"/><circle cx="7" cy="7" r="2.5"/><circle cx="17" cy="7" r="2.5"/><circle cx="12" cy="18" r="2.5"/></svg></span><strong>동네 광장</strong></a><p>가볍게 만나고, 오래 이어지는 우리 동네</p></div><button id="btn-open-chatbot" class="btn-primary" type="button">AI 광장 도우미 열기</button></footer>
 
     <div id="modal-login" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="login-title"><div class="modal glass-modal">
-        <div class="modal-header"><div><p class="eyebrow">WELCOME</p><h3 id="login-title">닉네임으로 시작해요</h3></div><button class="btn-close" id="btn-close-login" type="button" aria-label="닫기">×</button></div>
-        <div class="modal-body"><p class="login-copy">실명·사진·스펙 없이, 활동에 필요한 최소 정보만 사용합니다.</p><form id="form-login"><div class="form-group"><label for="input-nickname">사용할 닉네임</label><input type="text" id="input-nickname" maxlength="24" autocomplete="nickname" placeholder="예: 느긋한 산책러" required><small class="form-help">2~24자, 다른 사람에게 보이는 이름입니다.</small></div><label class="consent-row"><input type="checkbox" id="login-consent" required><span>커뮤니티 안전 규칙과 개인정보 최소 이용 안내를 확인했습니다.</span></label><button class="btn-primary w-100" type="submit">닉네임으로 시작하기</button></form></div>
+        <div class="modal-header"><div><p class="eyebrow">QUICK LOGIN</p><h3 id="login-title">아이디로 로그인</h3></div><button class="btn-close" id="btn-close-login" type="button" aria-label="닫기">×</button></div>
+        <div class="modal-body"><p class="login-copy">회원가입 때 입력한 아이디와 비밀번호로 로그인해 주세요. 로그인 후에는 설정한 공개 닉네임만 다른 참여자에게 보여요.</p><form id="form-login" novalidate><div class="form-group"><label for="input-login-id">아이디</label><input type="text" id="input-login-id" maxlength="24" autocomplete="username" placeholder="영문·숫자·_- 조합" required></div><div class="form-group"><label for="input-login-password">비밀번호</label><input type="password" id="input-login-password" autocomplete="current-password" placeholder="비밀번호를 입력해 주세요" required></div><p class="form-help login-mode-note">현재 MVP에서는 아이디·비밀번호를 브라우저 안전 저장소 기준으로 확인합니다.</p><label class="consent-row"><input type="checkbox" id="login-consent" required><span>커뮤니티 안전 규칙과 개인정보 최소 이용 안내를 확인했습니다.</span></label><p id="login-submit-status" class="form-submit-status" role="status" aria-live="polite"></p><button class="btn-primary w-100" type="submit">로그인</button></form></div>
     </div></div>
 
     <div id="modal-signup" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="signup-title"><div class="modal glass-modal signup-modal">
-        <div class="modal-header"><div><p class="eyebrow">JOIN THE PLAZA</p><h3 id="signup-title">안전한 참여를 위한 기본 정보</h3></div><button class="btn-close" id="btn-close-signup" type="button" aria-label="닫기">×</button></div>
-        <div class="modal-body"><p class="signup-notice">실명 정보는 다른 사용자에게 공개되지 않습니다. 본인인증은 현재 개발용으로 동작합니다.</p><form id="form-signup">
+        <div class="modal-header"><div><p class="eyebrow">JOIN THE PLAZA</p><h3 id="signup-title">회원가입</h3></div><button class="btn-close" id="btn-close-signup" type="button" aria-label="닫기">×</button></div>
+        <div class="modal-body"><p class="signup-notice">실명 정보는 다른 사용자에게 공개되지 않습니다. 기본 정보 입력을 완료하면 다음 단계에서 공개 닉네임을 설정합니다. 본인인증은 현재 개발용으로 동작합니다.</p><form id="form-signup" novalidate>
             <div class="signup-grid"><div class="form-group"><label for="signup-name">이름</label><input type="text" id="signup-name" autocomplete="name" required></div><div class="form-group"><label for="signup-gender">성별</label><select id="signup-gender" required><option value="">선택해 주세요</option><option value="male">남자</option><option value="female">여자</option></select></div><div class="form-group"><label for="signup-age">나이</label><input type="number" id="signup-age" min="20" max="100" step="1" inputmode="numeric" placeholder="20세 이상" required><small id="signup-age-status" class="form-help">만 20세 이상만 가입할 수 있어요.</small></div><div class="form-group"><label for="signup-phone">휴대폰 번호</label><input type="tel" id="signup-phone" autocomplete="tel" placeholder="010-0000-0000" required></div></div>
             <div class="form-group"><label for="signup-id">아이디</label><div class="inline-input"><input type="text" id="signup-id" maxlength="24" autocomplete="username" required><button type="button" class="btn-outline btn-small" id="btn-check-id">중복 확인</button></div><small id="signup-id-status" class="form-help"></small></div>
             <div class="signup-grid"><div class="form-group"><label for="signup-password">비밀번호</label><input type="password" id="signup-password" autocomplete="new-password" minlength="8" required></div><div class="form-group"><label for="signup-password-confirm">비밀번호 중복 확인</label><input type="password" id="signup-password-confirm" autocomplete="new-password" minlength="8" required></div></div>
-            <div class="form-group"><label for="signup-password-second">비밀번호 2차 확인</label><input type="password" id="signup-password-second" autocomplete="new-password" minlength="8" required></div>
             <div class="verification-box"><div class="form-group"><label for="signup-verification-method">본인인증 방법</label><select id="signup-verification-method"><option value="phone">휴대폰 인증</option><option value="email">이메일 인증</option></select></div><div class="form-group"><label for="signup-verification-contact">인증 연락처</label><div class="inline-input"><input type="text" id="signup-verification-contact" placeholder="휴대폰 번호 또는 이메일" required><button type="button" class="btn-outline btn-small" id="btn-send-verification">인증하기</button></div></div><div class="form-group"><label for="signup-verification-code">인증번호</label><div class="inline-input"><input type="text" id="signup-verification-code" inputmode="numeric" maxlength="6" placeholder="개발용: 123456"><button type="button" class="btn-outline btn-small" id="btn-complete-verification">인증 확인</button></div></div><small id="signup-verification-status" class="form-help">개발용 인증 흐름입니다.</small></div>
-            <label class="consent-row"><input type="checkbox" id="signup-privacy-consent" required><span>개인정보 수집·이용 동의 (필수)</span></label><label class="consent-row"><input type="checkbox" id="signup-marketing-consent"><span>광고성 문자 수신 동의 (선택)</span></label><button class="btn-primary w-100" type="submit">회원가입 완료</button>
+            <label class="consent-row"><input type="checkbox" id="signup-privacy-consent" required><span>개인정보 수집·이용 동의 (필수)</span></label><label class="consent-row"><input type="checkbox" id="signup-marketing-consent"><span>광고성 문자 수신 동의 (선택)</span></label><p id="signup-submit-status" class="form-submit-status" role="status" aria-live="polite"></p><button class="btn-primary w-100" type="submit">회원가입 완료</button>
         </form></div>
     </div></div>
 
-    <div id="modal-nickname-setup" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="nickname-setup-title"><div class="modal glass-modal"><div class="modal-header"><div><p class="eyebrow">ONE LAST STEP</p><h3 id="nickname-setup-title">공개 닉네임을 정해 주세요</h3></div></div><div class="modal-body"><p class="signup-success-message">회원가입이 성공적으로 완료되었습니다.</p><p class="login-copy">이 닉네임만 다른 참여자에게 공개됩니다.</p><form id="form-nickname-setup"><div class="form-group"><label for="input-signup-nickname">공개 닉네임</label><input type="text" id="input-signup-nickname" maxlength="24" autocomplete="nickname" placeholder="예: 느긋한 산책러" required></div><button class="btn-primary w-100" type="submit">닉네임 저장하고 시작하기</button></form></div></div></div>
+    <div id="modal-nickname-setup" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="nickname-setup-title"><div class="modal glass-modal"><div class="modal-header"><div><p class="eyebrow">PUBLIC NICKNAME</p><h3 id="nickname-setup-title">회원가입 완료 · 닉네임 설정</h3></div></div><div class="modal-body"><p class="signup-success-message">회원가입이 완료되었습니다. 다른 참여자에게 보여줄 공개 닉네임을 정해 주세요.</p><p class="login-copy">실명 대신 이 닉네임만 활동 화면에 공개됩니다.</p><form id="form-nickname-setup" novalidate><div class="form-group"><label for="input-signup-nickname">공개 닉네임</label><input type="text" id="input-signup-nickname" maxlength="24" autocomplete="nickname" placeholder="예: 느긋한 산책러" required><small class="form-help">2~24자, 한글·영문·숫자와 기본 기호를 사용할 수 있습니다.</small></div><p id="nickname-submit-status" class="form-submit-status" role="status" aria-live="polite"></p><button class="btn-primary w-100" type="submit">닉네임 저장하고 활동 시작하기</button></form></div></div></div>
 
-    <div id="modal-profile" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="profile-title"><div class="modal glass-modal profile-modal"><div class="modal-header"><div><p class="eyebrow">MY PAGE</p><h3 id="profile-title">내 무프로필</h3></div><button class="btn-close" id="btn-close-profile" type="button" aria-label="닫기">×</button></div><div class="modal-body"><div class="profile-hero"><span>🌱</span><div><strong id="profile-preview-name">무프로필</strong><p>공개되는 것은 닉네임과 참여 온도뿐이에요.</p></div></div><p class="temperature-guide profile-temperature-guide">참여 온도는 시간 약속·매너·규칙 준수에 기반하며 외모·성별·나이를 평가하지 않습니다.</p><form id="form-profile"><div class="form-group"><label for="input-profile-nickname">닉네임 변경</label><input type="text" id="input-profile-nickname" maxlength="24" autocomplete="nickname" required></div><button class="btn-primary w-100" type="submit">닉네임 저장</button></form><button id="btn-logout" class="btn-danger-outline w-100" type="button">로그아웃</button></div></div></div>
+    <div id="modal-profile" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="profile-title"><div class="modal glass-modal profile-modal"><div class="modal-header"><div><p class="eyebrow">MY PAGE</p><h3 id="profile-title">내 무프로필</h3></div><button class="btn-close" id="btn-close-profile" type="button" aria-label="닫기">×</button></div><div class="modal-body"><div class="profile-hero"><span>🌱</span><div><strong id="profile-preview-name">무프로필</strong><p>공개되는 것은 닉네임과 참여 온도뿐이에요.</p></div></div><div class="temperature-guide profile-temperature-guide"><strong>참여 온도 = 함께하기 신뢰도</strong><p>기본 50°C에서 시작하며, 활동 후 세 가지 행동 피드백으로만 변합니다. 외모·성별·나이·인기와는 관계없어요.</p><div class="temperature-dimensions compact"><span>시간 약속</span><span>배려와 매너</span><span>규칙 준수</span></div><small>좋았어요 +1°C · 개선이 필요해요 −2°C</small></div><form id="form-profile" novalidate><div class="form-group"><label for="input-profile-nickname">닉네임 변경</label><input type="text" id="input-profile-nickname" maxlength="24" autocomplete="nickname" required></div><p id="profile-submit-status" class="form-submit-status" role="status" aria-live="polite"></p><button class="btn-primary w-100" type="submit">닉네임 저장</button></form><button id="btn-logout" class="btn-danger-outline w-100" type="button">로그아웃</button></div></div></div>
 
-    <div id="modal-create" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="create-title"><div class="modal glass-modal create-modal"><div class="modal-header"><div><p class="eyebrow">MAKE AN ACTIVITY</p><h3 id="create-title">새로운 모임 만들기</h3></div><button class="btn-close" id="btn-close-create" type="button" aria-label="닫기">×</button></div><div class="modal-body"><p class="signup-notice">공개된 장소에서 진행되는 3~6명 활동만 만들 수 있어요.</p><form id="form-create-group"><div class="form-group"><label for="input-purpose">모임 목적</label><input type="text" id="input-purpose" placeholder="예: 퇴근 후 가벼운 산책과 대화" required></div><div class="signup-grid"><div class="form-group"><label for="input-category">활동 유형</label><select id="input-category" required><option value="">활동 유형을 선택해 주세요</option></select></div><div class="form-group"><label for="input-age-group">참여 연령대</label><select id="input-age-group" required><option value="all">전 연령 참여 가능</option><option value="20s">20대 중심</option><option value="30s">30대 중심</option><option value="40s">40대 중심</option><option value="50plus">50대 이상 중심</option></select></div></div><div class="form-group"><label for="input-title">모임 제목</label><input type="text" id="input-title" placeholder="예: 한강 공원 산책하실 분" maxlength="80" required></div><div class="form-group"><label for="input-desc">모임 설명</label><textarea id="input-desc" placeholder="모임의 활동 내용을 자세히 적어주세요." rows="4" maxlength="500" required></textarea></div><div class="form-group"><label for="input-location">공개된 장소</label><input type="text" id="input-location" placeholder="예: 스타벅스 망원점" required></div><div class="signup-grid"><div class="form-group"><label for="input-time">모임 일시</label><input type="datetime-local" id="input-time" required></div><div class="form-group"><label for="input-limit">모집 인원 (3~6명)</label><select id="input-limit" required><option value="3">3명</option><option value="4">4명</option><option value="5">5명</option><option value="6" selected>6명</option></select></div></div><div class="ai-feedback hidden" id="ai-feedback-box"><span class="ai-icon">✦</span><p id="ai-feedback-text"></p></div><button type="submit" class="btn-primary w-100" id="btn-submit-group">안전 검토 후 모임 등록</button></form></div></div></div>
+    <div id="modal-create" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="create-title"><div class="modal glass-modal create-modal"><div class="modal-header"><div><p class="eyebrow">MAKE AN ACTIVITY</p><h3 id="create-title">새로운 모임 만들기</h3></div><button class="btn-close" id="btn-close-create" type="button" aria-label="닫기">×</button></div><div class="modal-body"><p class="signup-notice">공개된 장소에서 진행되는 3~6명 활동만 만들 수 있어요.</p><form id="form-create-group" novalidate><div class="form-group"><label for="input-purpose">모임 목적</label><input type="text" id="input-purpose" placeholder="예: 퇴근 후 가벼운 산책과 대화" required></div><div class="signup-grid"><div class="form-group"><label for="input-category">활동 유형</label><select id="input-category" required><option value="">활동 유형을 선택해 주세요</option></select></div><div class="form-group"><label for="input-age-group">참여 연령대</label><select id="input-age-group" required><option value="all">전 연령 참여 가능</option><option value="20s">20대 중심</option><option value="30s">30대 중심</option><option value="40s">40대 중심</option><option value="50plus">50대 이상 중심</option></select></div></div><div class="form-group"><label for="input-title">모임 제목</label><input type="text" id="input-title" placeholder="예: 한강 공원 산책하실 분" maxlength="80" required></div><div class="form-group"><label for="input-desc">모임 설명</label><textarea id="input-desc" placeholder="모임의 활동 내용을 자세히 적어주세요." rows="4" maxlength="500" required></textarea></div><div class="form-group"><label for="input-location">공개된 장소</label><input type="text" id="input-location" placeholder="예: 스타벅스 망원점" required></div><div class="signup-grid"><div class="form-group"><label for="input-time">모임 일시</label><input type="datetime-local" id="input-time" required></div><div class="form-group"><label for="input-limit">모집 인원 (3~6명)</label><select id="input-limit" required><option value="3">3명</option><option value="4">4명</option><option value="5">5명</option><option value="6" selected>6명</option></select></div></div><div class="ai-feedback hidden" id="ai-feedback-box"><span class="ai-icon">✦</span><p id="ai-feedback-text"></p></div><button type="submit" class="btn-primary w-100" id="btn-submit-group">안전 검토 후 모임 등록</button></form></div></div></div>
 
-    <div id="modal-feedback" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="feedback-title"><div class="modal glass-modal"><div class="modal-header"><div><p class="eyebrow">AFTER THE ACTIVITY</p><h3 id="feedback-title">행동 기반 평가</h3></div><button class="btn-close" id="btn-close-feedback" type="button" aria-label="닫기">×</button></div><div class="modal-body"><p class="login-copy">외모·스펙·연애 적합성이 아닌 행동만 평가해 주세요.</p><form id="form-feedback"><div class="form-group"><label for="feedback-subject">평가할 참여자</label><select id="feedback-subject" required></select></div><div class="form-group"><label for="feedback-punctuality">시간 약속</label><select id="feedback-punctuality" required><option value="positive">잘 지켰어요</option><option value="negative">지키지 않았어요</option></select></div><div class="form-group"><label for="feedback-courtesy">친절과 매너</label><select id="feedback-courtesy" required><option value="positive">친절했어요</option><option value="negative">개선이 필요해요</option></select></div><div class="form-group"><label for="feedback-rules">커뮤니티 규칙</label><select id="feedback-rules" required><option value="positive">잘 지켰어요</option><option value="negative">위반했어요</option></select></div><button class="btn-primary w-100" type="submit">평가 제출</button></form></div></div></div>
+    <div id="modal-feedback" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="feedback-title"><div class="modal glass-modal"><div class="modal-header"><div><p class="eyebrow">AFTER THE ACTIVITY</p><h3 id="feedback-title">행동 기반 평가</h3></div><button class="btn-close" id="btn-close-feedback" type="button" aria-label="닫기">×</button></div><div class="modal-body"><p class="login-copy">외모·스펙·연애 적합성이 아닌 행동만 평가해 주세요.</p><form id="form-feedback" novalidate><div class="form-group"><label for="feedback-subject">평가할 참여자</label><select id="feedback-subject" required></select></div><div class="form-group"><label for="feedback-punctuality">시간 약속</label><select id="feedback-punctuality" required><option value="positive">잘 지켰어요</option><option value="negative">지키지 않았어요</option></select></div><div class="form-group"><label for="feedback-courtesy">친절과 매너</label><select id="feedback-courtesy" required><option value="positive">친절했어요</option><option value="negative">개선이 필요해요</option></select></div><div class="form-group"><label for="feedback-rules">커뮤니티 규칙</label><select id="feedback-rules" required><option value="positive">잘 지켰어요</option><option value="negative">위반했어요</option></select></div><p id="feedback-submit-status" class="form-submit-status" role="status" aria-live="polite"></p><button class="btn-primary w-100" type="submit">평가 제출</button></form></div></div></div>
 
     <div id="modal-notifications" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="notifications-title"><div class="modal glass-modal notification-modal"><div class="modal-header"><div><p class="eyebrow">NOTIFICATIONS</p><h3 id="notifications-title">참여 전에 확인해 주세요</h3></div><button class="btn-close" id="btn-close-notifications" type="button" aria-label="닫기">×</button></div><div id="notification-list" class="modal-body notification-list"></div></div></div>
 
-    <div id="modal-chatbot" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="chatbot-title"><div class="modal glass-modal chatbot-modal"><div class="modal-header"><div><p class="eyebrow">AI GUIDE</p><h3 id="chatbot-title">AI 광장 도우미</h3></div><button class="btn-close" id="btn-close-chatbot" type="button" aria-label="닫기">×</button></div><div class="modal-body"><div id="chat-messages" class="chat-messages" aria-live="polite"><div class="chat-message assistant">모임 찾기, 참여 방법, 안전 규칙을 안내해 드릴게요.</div></div><form id="form-chatbot" class="chat-form"><input type="text" id="input-chatbot" maxlength="240" placeholder="예: 처음 참여할 때 주의할 점은?" required><button class="btn-primary" type="submit">보내기</button></form></div></div></div>
+    <div id="modal-chatbot" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="chatbot-title"><div class="modal glass-modal chatbot-modal"><div class="modal-header"><div><p class="eyebrow">AI GUIDE</p><h3 id="chatbot-title">AI 광장 도우미</h3></div><button class="btn-close" id="btn-close-chatbot" type="button" aria-label="닫기">×</button></div><div class="modal-body"><div id="chat-messages" class="chat-messages" aria-live="polite"><div class="chat-message assistant">모임 찾기, 참여 방법, 안전 규칙을 안내해 드릴게요.</div></div><form id="form-chatbot" class="chat-form" novalidate><input type="text" id="input-chatbot" maxlength="240" placeholder="예: 처음 참여할 때 주의할 점은?" required><button class="btn-primary" type="submit">보내기</button></form></div></div></div>
 
     <div id="global-loader" class="modal-overlay hidden"><div class="spinner"></div><p class="loader-text">AI 안심 에이전트가 모임 내용을 분석 중입니다...</p></div>
 

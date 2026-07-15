@@ -7,6 +7,9 @@
 - For local demo mode, leave provider placeholders in `config.js`.
 - For persistent mode, configure public Supabase settings and route AI screening through the
   protected server boundary described in the plan.
+- To exercise the real semantic safety agent, run
+  `/Users/cw/Downloads/Censorship_Agent/scripts/run_server.py` with provider credentials in
+  environment variables, then point n8n's `SAFETY_CLASSIFIER_URL` at its `/moderate` endpoint.
 
 ## Run
 
@@ -22,11 +25,13 @@ AI secret in `config.js` or browser source.
    then recruiting state.
 3. Create text containing dating, sales, investment, or proselytizing intent and confirm the
    activity remains held with a category and correction guidance.
-4. Join an activity from two independent browser sessions and confirm the count never exceeds
+4. With the protected gateway enabled, submit a safe activity and an obfuscated-risk activity
+   such as `ㄷㅂ사주실분`; confirm that only the safe activity can become `recruiting`.
+5. Join an activity from two independent browser sessions and confirm the count never exceeds
    the limit and both views receive the update within the stated target.
-5. Exercise an activity with fewer than three confirmed participants at the cancellation
+6. Exercise an activity with fewer than three confirmed participants at the cancellation
    threshold and confirm the state and participant warning.
-6. After completion, confirm behavior-only feedback dimensions and one-review-per-participant
+7. After completion, confirm behavior-only feedback dimensions and one-review-per-participant
    rules.
 
 ## Evidence to record

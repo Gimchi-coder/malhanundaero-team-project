@@ -8,7 +8,7 @@
 | private_identity | Protected verification fields | Restricted access; not in public projections |
 | nickname | Public display name | Required, unique within the service |
 | icon | Public character/icon choice | No uploaded photos |
-| trust_score | Behavior-based public trust projection | Starts at 36.5; formula is configurable |
+| trust_score | Behavior-based public trust projection | Starts at 50; positive behavior +1, improvement-needed behavior -2; clamped to 0–100 |
 | eligibility_state | Whether joining/creating is allowed | Restricted users cannot mutate activities |
 
 ## Activity

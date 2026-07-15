@@ -5,6 +5,10 @@
 This contract is the stable boundary between the browser, n8n, and a protected semantic AI
 provider. The browser must not depend on provider-specific response fields.
 
+The current protected classifier implementation is the external
+`/Users/cw/Downloads/Censorship_Agent` gateway. It reads provider credentials only from its
+server environment and exposes `/moderate`; n8n is the preferred public-facing boundary.
+
 ## Input
 
 ```json
@@ -49,6 +53,10 @@ private profile fields.
 Missing, malformed, conflicting, low-confidence, or unavailable results are never approved.
 `held` is used when a prohibited intent is sufficiently supported. `manual_review` is used
 when context is ambiguous or the provider fails safely.
+
+The external agent maps its `allow / revise / review / block` result to this contract as follows:
+`allow → approved`, `revise/block → held`, and `review → manual_review`. A permanent deletion
+is not performed by the agent; an already published item requires an explicit operator action.
 
 ## Recommendation response
 

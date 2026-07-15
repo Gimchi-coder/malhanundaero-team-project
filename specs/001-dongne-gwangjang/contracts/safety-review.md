@@ -14,6 +14,11 @@
 The request is sent only through the protected server boundary in production. The client may
 use a deterministic mock adapter for local development.
 
+The protected boundary may be the Censorship_Agent gateway at
+`/Users/cw/Downloads/Censorship_Agent/scripts/run_server.py`. It accepts the app's
+`safety_review` envelope, performs normalization and hybrid semantic review, and returns this
+contract without exposing the provider key to the browser.
+
 ## Response
 
 ```json

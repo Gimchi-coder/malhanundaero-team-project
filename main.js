@@ -2,9 +2,13 @@
 
 const MIN_PARTICIPANTS = 3;
 const DEFAULT_MAX_PARTICIPANTS = 6;
+const TRUST_BASELINE = 50;
+const TRUST_POSITIVE_DELTA = 1;
+const TRUST_NEGATIVE_DELTA = 2;
 const CANCEL_WINDOW_MS = 2 * 60 * 60 * 1000;
 const GROUPS_KEY = 'dg_groups_v2';
 const USER_KEY = 'dg_user';
+const ACCOUNTS_KEY = 'dg_accounts_v1';
 const PRIVATE_PROFILE_KEY = 'dg_private_profile_v1';
 const REPORTS_KEY = 'dg_reports_v1';
 const REVIEWS_KEY = 'dg_reviews_v1';
@@ -39,17 +43,20 @@ const elements = {
     loginModal: $('modal-login'),
     closeLogin: $('btn-close-login'),
     loginForm: $('form-login'),
+    loginSubmitStatus: $('login-submit-status'),
     signupModal: $('modal-signup'),
     closeSignup: $('btn-close-signup'),
     signupForm: $('form-signup'),
     nicknameSetupModal: $('modal-nickname-setup'),
     nicknameSetupForm: $('form-nickname-setup'),
+    nicknameSetupStatus: $('nickname-submit-status'),
     create: $('btn-create'),
     profile: $('user-profile'),
     profileButton: $('btn-profile'),
     profileModal: $('modal-profile'),
     closeProfile: $('btn-close-profile'),
     profileForm: $('form-profile'),
+    profileStatus: $('profile-submit-status'),
     profileNickname: $('input-profile-nickname'),
     profilePreviewName: $('profile-preview-name'),
     nickname: $('user-nickname'),
@@ -69,13 +76,14 @@ const elements = {
 elements.feedbackModal = $('modal-feedback');
 elements.feedbackForm = $('form-feedback');
 elements.closeFeedback = $('btn-close-feedback');
+elements.feedbackSubmitStatus = $('feedback-submit-status');
 elements.recommendationForm = $('form-recommendation');
 elements.recommendationStatus = $('recommendation-status');
 elements.recommendationList = $('recommendation-list');
 elements.search = $('input-group-search');
 elements.applySearch = $('btn-apply-search');
 elements.createMain = $('btn-create-main');
-elements.createHero = $('btn-create-hero');
+elements.recommendationHero = $('btn-recommendation-hero');
 elements.createGuide = $('btn-create-guide');
 elements.ageFilters = $('age-filter-buttons');
 elements.categoryFilters = $('category-filter-buttons');
@@ -83,12 +91,18 @@ elements.groupCount = $('group-count');
 elements.boardList = $('board-list');
 elements.boardEmpty = $('board-empty');
 elements.categoryList = $('category-list');
+elements.activityExamples = $('activity-examples');
+elements.signupSubmitStatus = $('signup-submit-status');
 elements.chatModal = $('modal-chatbot');
 elements.openChat = $('btn-open-chatbot');
 elements.closeChat = $('btn-close-chatbot');
 elements.chatForm = $('form-chatbot');
 elements.chatInput = $('input-chatbot');
 elements.chatMessages = $('chat-messages');
+elements.enterActivities = $('btn-enter-activities');
+elements.recommendationDock = $('ai-recommendation');
+elements.viewTabs = [...document.querySelectorAll('[data-view-target]')];
+elements.navCreate = $('nav-create');
 const signupState = { idAvailable: false, idCheckedId: '', verificationComplete: false };
 
 const safeJson = (value, fallback) => {
@@ -101,8 +115,44 @@ function publicUser(user) {
         id: String(user.id),
         nickname: String(user.nickname).slice(0, 24),
         icon: user.icon || '🌱',
-        trustScore: normalizedTrustScore(user.trustScore)
+        trustScore: getTrustProjection(user.id, user.trustScore)
     };
+}
+
+function normalizeNickname(nickname) {
+    return String(nickname || '').normalize('NFKC').trim().toLowerCase();
+}
+
+function normalizeLoginId(loginId) {
+    return String(loginId || '').normalize('NFKC').trim().toLowerCase();
+}
+
+async function hashSecret(secret) {
+    const bytes = new TextEncoder().encode(String(secret));
+    const digest = await crypto.subtle.digest('SHA-256', bytes);
+    return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function getAccounts() {
+    const accounts = safeJson(localStorage.getItem(ACCOUNTS_KEY), []);
+    return Array.isArray(accounts) ? accounts : [];
+}
+
+function saveAccounts(accounts) {
+    localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
+}
+
+function upsertAccount(account) {
+    const accounts = getAccounts();
+    const previous = accounts.find((item) => item.id === String(account.id)) || {};
+    const next = accounts.filter((item) => item.id !== String(account.id));
+    next.push({ ...previous, ...account, id: String(account.id), nickname: String(account.nickname ?? previous.nickname ?? ''), trustScore: normalizedTrustScore(account.trustScore ?? previous.trustScore), createdAt: previous.createdAt || account.createdAt || new Date().toISOString() });
+    saveAccounts(next);
+}
+
+function migrateCurrentUserAccount(user) {
+    if (!user || getAccounts().some((account) => account.id === String(user.id))) return;
+    upsertAccount({ id: user.id, nickname: user.nickname, loginId: '', passwordHash: '', trustScore: user.trustScore });
 }
 
 function ageGroupFromAge(age) {
@@ -132,7 +182,18 @@ function trustScoreClass(score) {
 
 function normalizedTrustScore(score) {
     const value = Number(score);
-    return Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 50;
+    return Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : TRUST_BASELINE;
+}
+
+function getTrustProjection(userId, fallback = TRUST_BASELINE) {
+    const trust = safeJson(localStorage.getItem(TRUST_KEY), {});
+    return normalizedTrustScore(trust[String(userId)] ?? fallback);
+}
+
+function calculateTrustDelta(values) {
+    const positive = values.filter((value) => value === 'positive').length;
+    const negative = values.filter((value) => value === 'negative').length;
+    return positive * TRUST_POSITIVE_DELTA - negative * TRUST_NEGATIVE_DELTA;
 }
 
 function seedGroups() {
@@ -240,7 +301,7 @@ function ensureGroupMetadata(group) {
     group.ageGroup = group.ageGroup || 'all';
     group.category = group.category || '기타 모임';
     group.categoryFamily = group.categoryFamily && group.categoryFamily !== 'other' ? group.categoryFamily : activityFamilyForType(group.category);
-    group.hostTrustScore = normalizedTrustScore(group.hostTrustScore);
+    group.hostTrustScore = getTrustProjection(group.creatorId, group.hostTrustScore);
     if (!privateGroupState.has(group.id)) {
         privateGroupState.set(group.id, group.privateGenderCounts || { male: group.participants || 0, female: 0 });
     }
@@ -414,6 +475,41 @@ function setStatus(message, tone = 'info') {
     elements.status.dataset.tone = tone;
 }
 
+function setInlineStatus(element, message, tone = 'warning') {
+    if (element) {
+        element.textContent = message;
+        element.dataset.tone = tone;
+    }
+    setStatus(message, tone);
+    return false;
+}
+
+function setSignupStatus(message, tone = 'warning', focusId = '') {
+    setInlineStatus(elements.signupSubmitStatus, message, tone);
+    if (focusId) $(focusId)?.focus();
+    return false;
+}
+
+function setLoginStatus(message, tone = 'warning', focusId = '') {
+    if (focusId) $(focusId)?.focus();
+    return setInlineStatus(elements.loginSubmitStatus, message, tone);
+}
+
+function setNicknameStatus(message, tone = 'warning', focusId = '') {
+    if (focusId) $(focusId)?.focus();
+    return setInlineStatus(elements.nicknameSetupStatus, message, tone);
+}
+
+function setProfileStatus(message, tone = 'warning', focusId = '') {
+    if (focusId) $(focusId)?.focus();
+    return setInlineStatus(elements.profileStatus, message, tone);
+}
+
+function setFeedbackStatus(message, tone = 'warning', focusId = '') {
+    if (focusId) $(focusId)?.focus();
+    return setInlineStatus(elements.feedbackSubmitStatus, message, tone);
+}
+
 function setLoading(isLoading) {
     elements.loader.classList.toggle('hidden', !isLoading);
     elements.submit.disabled = isLoading;
@@ -452,7 +548,7 @@ function renderAgeFilters() {
         const button = createText('button', label, `filter-btn${state.filters.ageGroup === value ? ' active' : ''}`);
         button.type = 'button';
         button.dataset.ageFilter = value;
-        button.addEventListener('click', () => { state.filters.ageGroup = value; renderGroups(); });
+        button.addEventListener('click', () => { state.filters.ageGroup = value; renderGroups(); setStatus(`${label} 기준으로 활동을 보고 있어요.`, 'success'); });
         elements.ageFilters.append(button);
     });
 }
@@ -467,7 +563,7 @@ function renderCategoryFilters() {
         const button = createText('button', `${label} ${count}`, `category-filter${state.filters.category === id ? ' active' : ''}`);
         button.type = 'button';
         button.dataset.categoryFilter = id;
-        button.addEventListener('click', () => { state.filters.category = id; renderGroups(); });
+        button.addEventListener('click', () => { state.filters.category = id; renderGroups(); setStatus(`${label} 활동을 보고 있어요.`, 'success'); });
         elements.categoryFilters.append(button);
     });
 }
@@ -485,11 +581,12 @@ function renderGroups() {
     recruiting.forEach((group) => {
         ensureGroupMetadata(group);
         const card = document.createElement('article');
+        card.id = `activity-${group.id}`;
         card.className = 'group-card';
         const ageBadge = createText('span', group.ageGroup === 'all' ? '🌈 전 연령 참여 가능' : `${ageGroupLabel(group.ageGroup)} 중심 모임`, `age-badge${group.ageGroup === 'all' ? ' age-all' : ''}`);
         const temperature = normalizedTrustScore(group.hostTrustScore);
-        const temperatureBadge = createText('span', `🌡 개설자 참여 온도 ${temperature.toFixed(1)}°C`, `temperature-badge ${trustScoreClass(temperature)}`);
-        temperatureBadge.title = '개설자의 시간 약속·매너·규칙 준수에 기반한 공개 지표입니다.';
+        const temperatureBadge = createText('span', `🌡 개설자 함께하기 신뢰도 ${temperature.toFixed(1)}°C`, `temperature-badge ${trustScoreClass(temperature)}`);
+        temperatureBadge.title = '시간 약속·배려와 매너·규칙 준수에 기반한 공개 지표입니다. 인기나 외모를 평가하지 않습니다.';
         card.append(
             ageBadge,
             createText('span', `${activityFamilyLabel(group.categoryFamily)} · ${group.category}`, 'category-badge'),
@@ -534,9 +631,22 @@ function renderBoard() {
 function renderCategoryOptions() {
     const select = $('input-category');
     if (select) ACTIVITY_TYPES.forEach((type) => select.append(createText('option', type)));
-    if (!elements.categoryList) return;
-    elements.categoryList.replaceChildren();
-    ACTIVITY_TYPES.forEach((type) => elements.categoryList.append(createText('span', type, 'category-chip')));
+    if (elements.categoryList) {
+        elements.categoryList.replaceChildren();
+        ACTIVITY_TYPES.forEach((type) => elements.categoryList.append(createText('span', type, 'category-chip')));
+    }
+    if (elements.activityExamples) {
+        elements.activityExamples.replaceChildren();
+        ACTIVITY_TYPES.forEach((type) => {
+            const chip = createText('button', type, 'category-chip activity-example-chip');
+            chip.type = 'button';
+            chip.addEventListener('click', () => {
+                elements.search.value = type;
+                applyGroupSearch();
+            });
+            elements.activityExamples.append(chip);
+        });
+    }
 }
 
 function renderNotifications() {
@@ -662,17 +772,20 @@ function renderRecommendations(matches, preferences) {
         elements.recommendationStatus.dataset.tone = 'warning';
         return;
     }
-    elements.recommendationStatus.textContent = '현재 모집 중인 활동 중에서 맞춤 추천했어요.';
+    elements.recommendationStatus.textContent = '현재 모집 중인 활동 정보와 입력한 조건을 비교해 추천했어요.';
     elements.recommendationStatus.dataset.tone = 'success';
     matches.forEach((match) => {
         const group = state.groups.find((item) => item.id === match.activityId);
         if (!group) return;
         const card = document.createElement('article');
         card.className = 'recommendation-card';
-        card.append(createText('div', `${Math.round(match.fit * 100)}% 잘 맞아요`, 'fit-badge'), createText('h3', group.title), createText('p', match.reason, 'recommendation-reason'), createText('span', `📍 ${group.location} · ${formatDate(group.scheduledAt)}`, 'card-meta'));
+        card.append(createText('div', `${Math.round(match.fit * 100)}% 잘 맞아요`, 'fit-badge'), createText('h3', group.title), createText('p', match.reason, 'recommendation-reason'), createText('small', '근거: 현재 모집 중인 활동 정보와 입력한 조건', 'recommendation-source'), createText('span', `📍 ${group.location} · ${formatDate(group.scheduledAt)}`, 'card-meta'));
         const view = document.createElement('button');
         view.type = 'button'; view.className = 'btn-outline btn-small'; view.textContent = '활동 보기';
-        view.addEventListener('click', () => document.getElementById('group-list').scrollIntoView({ behavior: 'smooth', block: 'center' }));
+        view.addEventListener('click', () => {
+            setView('activities');
+            window.setTimeout(() => document.getElementById(`activity-${group.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 0);
+        });
         card.append(view); elements.recommendationList.append(card);
     });
 }
@@ -682,7 +795,7 @@ async function handleRecommendation(event) {
     const guard = guardRecommendationInput($('input-interest').value);
     if (!guard.ok) { elements.recommendationStatus.textContent = guard.message; elements.recommendationStatus.dataset.tone = 'warning'; return; }
     const preferences = { interest: guard.value, comfort: $('input-comfort').value, timeWindow: $('input-time-window').value };
-    elements.recommendationStatus.textContent = CONFIG.RECOMMENDATION_URL ? '보호된 AI 추천 경로를 확인하고 있어요...' : '관심사와 활동 맥락을 비교하고 있어요...';
+    elements.recommendationStatus.textContent = CONFIG.RECOMMENDATION_URL ? '보호된 추천 Agent가 활동 근거와 조건을 확인하고 있어요...' : '현재 모집 중인 활동 정보와 참여 조건을 비교하고 있어요...';
     const matches = await getRecommendations(preferences);
     renderRecommendations(matches, preferences);
 }
@@ -706,12 +819,13 @@ function updateNav() {
 
 function openLogin() {
     elements.loginModal.classList.remove('hidden');
-    $('input-nickname').focus();
+    $('input-login-id').focus();
 }
 
 function closeLogin() {
     elements.loginModal.classList.add('hidden');
     elements.loginForm.reset();
+    if (elements.loginSubmitStatus) { elements.loginSubmitStatus.textContent = ''; elements.loginSubmitStatus.dataset.tone = ''; }
 }
 
 function openSignup() {
@@ -725,13 +839,18 @@ function closeSignup() {
     signupState.idAvailable = false;
     signupState.idCheckedId = '';
     signupState.verificationComplete = false;
+    $('signup-id').dataset.checkedId = '';
+    $('signup-id').dataset.idAvailable = '';
     $('signup-id-status').textContent = '';
+    elements.signupSubmitStatus.textContent = '';
+    elements.signupSubmitStatus.dataset.tone = '';
     $('signup-age-status').textContent = '만 20세 이상만 가입할 수 있어요.';
     $('signup-age-status').dataset.tone = '';
     $('signup-verification-status').textContent = '개발용 인증 흐름입니다.';
 }
 
 function openNicknameSetup() {
+    if (elements.nicknameSetupStatus) { elements.nicknameSetupStatus.textContent = ''; elements.nicknameSetupStatus.dataset.tone = ''; }
     elements.nicknameSetupModal.classList.remove('hidden');
     $('input-signup-nickname').focus();
 }
@@ -746,15 +865,19 @@ function openProfile() {
 function closeProfile() {
     elements.profileModal.classList.add('hidden');
     elements.profileForm.reset();
+    if (elements.profileStatus) { elements.profileStatus.textContent = ''; elements.profileStatus.dataset.tone = ''; }
 }
 
 function submitProfile(event) {
     event.preventDefault();
     if (!state.user) return closeProfile();
     const nickname = elements.profileNickname.value.trim();
-    if (nickname.length < 2 || nickname.length > 24) return setStatus('닉네임은 2~24자로 입력해 주세요.', 'warning');
-    if (!/^[\p{L}\p{N} _-]+$/u.test(nickname)) return setStatus('닉네임에는 한글, 영문, 숫자와 기본 기호만 사용할 수 있습니다.', 'warning');
+    if (nickname.length < 2 || nickname.length > 24) return setProfileStatus('닉네임은 2~24자로 입력해 주세요.', 'warning', 'input-profile-nickname');
+    if (!/^[\p{L}\p{N} _-]+$/u.test(nickname)) return setProfileStatus('닉네임에는 한글, 영문, 숫자와 기본 기호만 사용할 수 있습니다.', 'warning', 'input-profile-nickname');
+    const duplicate = getAccounts().some((account) => account.id !== state.user.id && normalizeNickname(account.nickname) === normalizeNickname(nickname));
+    if (duplicate) return setProfileStatus('이미 사용 중인 닉네임입니다. 다른 닉네임을 입력해 주세요.', 'warning', 'input-profile-nickname');
     state.user = publicUser({ ...state.user, nickname });
+    upsertAccount({ id: state.user.id, nickname, trustScore: state.user.trustScore });
     localStorage.setItem(USER_KEY, JSON.stringify(state.user));
     closeProfile();
     updateNav();
@@ -764,38 +887,54 @@ function submitProfile(event) {
 function submitNicknameSetup(event) {
     event.preventDefault();
     const nickname = $('input-signup-nickname').value.trim();
-    if (nickname.length < 2 || nickname.length > 24) return setStatus('닉네임은 2~24자로 입력해 주세요.', 'warning');
-    if (!/^[\p{L}\p{N} _-]+$/u.test(nickname)) return setStatus('닉네임에는 한글, 영문, 숫자와 기본 기호만 사용할 수 있습니다.', 'warning');
-    state.user = publicUser({ id: state.pendingSignupId || crypto.randomUUID?.() || String(Date.now()), nickname, icon: '🌱', trustScore: 50 });
+    if (nickname.length < 2 || nickname.length > 24) return setNicknameStatus('닉네임은 2~24자로 입력해 주세요.', 'warning', 'input-signup-nickname');
+    if (!/^[\p{L}\p{N} _-]+$/u.test(nickname)) return setNicknameStatus('닉네임에는 한글, 영문, 숫자와 기본 기호만 사용할 수 있습니다.', 'warning', 'input-signup-nickname');
+    const accountId = state.pendingSignupId || crypto.randomUUID?.() || String(Date.now());
+    if (getAccounts().some((account) => normalizeNickname(account.nickname) === normalizeNickname(nickname))) return setNicknameStatus('이미 사용 중인 닉네임입니다. 다른 닉네임을 입력해 주세요.', 'warning', 'input-signup-nickname');
+    state.user = publicUser({ id: accountId, nickname, icon: '🌱', trustScore: TRUST_BASELINE });
+    upsertAccount({ id: accountId, nickname, trustScore: TRUST_BASELINE });
     state.pendingSignupId = null;
     localStorage.setItem(USER_KEY, JSON.stringify(state.user));
     elements.nicknameSetupModal.classList.add('hidden');
     elements.nicknameSetupForm.reset();
     state.filters.ageGroup = 'mine';
     updateNav();
-    setStatus('회원가입과 닉네임 설정이 완료되었습니다. 그룹 활동을 시작해 보세요.', 'success');
+    setView('activities', false);
+    setStatus('회원가입과 공개 닉네임 설정이 완료되어 자동 로그인되었습니다. 그룹 활동을 시작해 보세요.', 'success');
 }
 
 function checkSignupId() {
-    const id = $('signup-id').value.trim().toLowerCase();
+    const input = $('signup-id');
+    const id = input.value.trim().toLowerCase();
     const status = $('signup-id-status');
     if (!/^[a-z0-9][a-z0-9_-]{3,23}$/.test(id)) {
         signupState.idAvailable = false;
         signupState.idCheckedId = '';
+        input.dataset.checkedId = '';
+        input.dataset.idAvailable = 'false';
         status.textContent = '아이디는 영문·숫자·_- 조합 4~24자로 입력해 주세요.';
         status.dataset.tone = 'warning';
         return;
     }
     const usedIds = safeJson(localStorage.getItem('dg_signup_ids_v1'), []);
-    signupState.idAvailable = !usedIds.includes(id);
+    const usedId = Array.isArray(usedIds) && usedIds.some((usedIdValue) => normalizeLoginId(usedIdValue) === id);
+    const accountIdUsed = getAccounts().some((account) => normalizeLoginId(account.loginId) === id);
+    signupState.idAvailable = !usedId && !accountIdUsed;
     signupState.idCheckedId = id;
+    input.dataset.checkedId = id;
+    input.dataset.idAvailable = String(signupState.idAvailable);
     status.textContent = signupState.idAvailable ? '사용 가능한 아이디입니다.' : '이미 사용 중인 아이디입니다.';
     status.dataset.tone = signupState.idAvailable ? 'success' : 'warning';
 }
 
 function sendSignupVerification() {
     const contact = $('signup-verification-contact').value.trim();
-    if (!contact) return setStatus('인증 연락처를 입력해 주세요.', 'warning');
+    if (!contact) {
+        $('signup-verification-status').textContent = '인증 연락처를 입력해 주세요.';
+        $('signup-verification-status').dataset.tone = 'warning';
+        $('signup-verification-contact').focus();
+        return false;
+    }
     signupState.verificationComplete = true;
     $('signup-verification-status').textContent = '본인인증이 완료되었습니다. (개발용)';
     $('signup-verification-status').dataset.tone = 'success';
@@ -824,34 +963,65 @@ function enforceSignupAge(event) {
 }
 
 function completeSignupVerification() {
-    if ($('signup-verification-code').value.trim() !== '123456') {
-        signupState.verificationComplete = false;
-        $('signup-verification-status').textContent = '인증번호가 올바르지 않습니다.';
+    const code = $('signup-verification-code').value.trim();
+    if (!signupState.verificationComplete) {
+        $('signup-verification-status').textContent = '먼저 인증하기를 눌러 인증을 시작해 주세요.';
         $('signup-verification-status').dataset.tone = 'warning';
         return;
     }
-    signupState.verificationComplete = true;
-    $('signup-verification-status').textContent = '본인인증이 완료되었습니다. (개발용)';
+    if (!code) {
+        $('signup-verification-status').textContent = '개발용 인증은 이미 완료되었습니다. 인증번호 입력은 선택 사항입니다.';
+        $('signup-verification-status').dataset.tone = 'success';
+        return;
+    }
+    if (!/^\d{4,6}$/.test(code)) {
+        $('signup-verification-status').textContent = '인증번호가 올바르지 않습니다.';
+        $('signup-verification-status').dataset.tone = 'info';
+        return;
+    }
+    $('signup-verification-status').textContent = code === '123456'
+        ? '본인인증이 완료되었습니다. (개발용)'
+        : '인증하기 단계가 완료되어 회원가입을 계속할 수 있습니다. (개발용)';
     $('signup-verification-status').dataset.tone = 'success';
 }
 
-function submitSignup(event) {
+async function submitSignup(event) {
     event.preventDefault();
+    const requiredFields = [
+        ['signup-name', '이름'], ['signup-gender', '성별'], ['signup-age', '나이'], ['signup-phone', '휴대폰 번호'],
+        ['signup-id', '아이디'], ['signup-password', '비밀번호'], ['signup-password-confirm', '비밀번호 확인'], ['signup-verification-contact', '인증 연락처']
+    ];
+    for (const [fieldId, label] of requiredFields) {
+        if (!$(`${fieldId}`).value.trim()) return setSignupStatus(`${label}을(를) 입력해 주세요.`, 'warning', fieldId);
+    }
+    if (!$('signup-privacy-consent').checked) return setSignupStatus('개인정보 수집·이용 동의가 필요합니다.', 'warning', 'signup-privacy-consent');
     const age = Number($('signup-age').value);
     if (!Number.isInteger(age) || age < 20 || age > 100) {
         $('signup-age-status').textContent = '20세 미만은 가입할 수 없습니다.';
         $('signup-age-status').dataset.tone = 'warning';
-        return setStatus('만 20세 이상만 가입할 수 있습니다.', 'warning');
+        return setSignupStatus('만 20세 이상만 가입할 수 있습니다.', 'warning', 'signup-age');
     }
     const password = $('signup-password').value;
-    const id = $('signup-id').value.trim().toLowerCase();
-    if (!signupState.idAvailable || signupState.idCheckedId !== id) return setStatus('아이디 입력 후 중복 확인을 완료해 주세요.', 'warning');
-    if (password !== $('signup-password-confirm').value) return setStatus('비밀번호 중복 확인값이 서로 일치하지 않습니다.', 'warning');
-    if (password !== $('signup-password-second').value) return setStatus('비밀번호 2차 확인값이 서로 일치하지 않습니다.', 'warning');
-    if (!signupState.verificationComplete) return setStatus('본인인증을 완료해 주세요.', 'warning');
+    const idInput = $('signup-id');
+    const id = idInput.value.trim().toLowerCase();
+    if (password.length < 8) return setSignupStatus('비밀번호는 8자 이상 입력해 주세요.', 'warning', 'signup-password');
+    if (idInput.dataset.checkedId !== id) return setSignupStatus('현재 아이디의 중복 확인을 먼저 완료해 주세요.', 'warning', 'signup-id');
+    if (idInput.dataset.idAvailable !== 'true') return setSignupStatus('사용할 수 없는 아이디입니다. 다른 아이디를 입력해 주세요.', 'warning', 'signup-id');
     const usedIds = safeJson(localStorage.getItem('dg_signup_ids_v1'), []);
+    const usedId = Array.isArray(usedIds) && usedIds.some((usedIdValue) => normalizeLoginId(usedIdValue) === id);
+    const accountIdUsed = getAccounts().some((account) => normalizeLoginId(account.loginId) === id);
+    if (usedId || accountIdUsed) return setSignupStatus('이미 사용 중인 아이디입니다. 다른 아이디를 입력해 주세요.', 'warning', 'signup-id');
+    if (password !== $('signup-password-confirm').value) return setSignupStatus('비밀번호와 확인값이 서로 일치하지 않습니다.', 'warning', 'signup-password-confirm');
+    if (!signupState.verificationComplete) return setSignupStatus('인증하기와 인증 확인을 완료해 주세요.', 'warning', 'signup-verification-code');
+    let passwordHash;
+    try {
+        passwordHash = await hashSecret(password);
+    } catch {
+        return setSignupStatus('비밀번호를 안전하게 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+    }
     localStorage.setItem('dg_signup_ids_v1', JSON.stringify([...new Set([...usedIds, id.toLowerCase()])]));
     state.pendingSignupId = crypto.randomUUID?.() || String(Date.now());
+    upsertAccount({ id: state.pendingSignupId, loginId: id, passwordHash, nickname: '', trustScore: TRUST_BASELINE });
     localStorage.setItem(PRIVATE_PROFILE_KEY, JSON.stringify({
         userId: state.pendingSignupId,
         name: $('signup-name').value.trim(),
@@ -863,25 +1033,34 @@ function submitSignup(event) {
         verificationMethod: $('signup-verification-method').value,
         marketingConsent: $('signup-marketing-consent').checked
     }));
-    state.user = publicUser({ id: state.pendingSignupId, nickname: id, icon: '🌱', trustScore: 50 });
-    localStorage.setItem(USER_KEY, JSON.stringify(state.user));
     closeSignup();
-    updateNav();
     openNicknameSetup();
-    setStatus('회원가입이 완료되어 로그인되었습니다. 공개 닉네임을 설정해 주세요.', 'success');
+    setStatus('회원가입이 완료되었습니다. 공개 닉네임을 설정해 주세요.', 'success');
 }
 
-function login(event) {
+async function login(event) {
     event.preventDefault();
-    const nickname = $('input-nickname').value.trim();
-    if (nickname.length < 2 || nickname.length > 24) return setStatus('닉네임은 2~24자로 입력해 주세요.', 'warning');
-    if (!/^[\p{L}\p{N} _-]+$/u.test(nickname)) return setStatus('닉네임에는 한글, 영문, 숫자와 기본 기호만 사용할 수 있습니다.', 'warning');
-    localStorage.removeItem(PRIVATE_PROFILE_KEY);
-    state.user = publicUser({ id: crypto.randomUUID?.() || String(Date.now()), nickname, icon: '🌱', trustScore: 50 });
+    const loginId = normalizeLoginId($('input-login-id').value);
+    const password = $('input-login-password').value;
+    if (!/^[a-z0-9][a-z0-9_-]{3,23}$/.test(loginId)) return setLoginStatus('아이디를 올바르게 입력해 주세요.', 'warning', 'input-login-id');
+    if (!password) return setLoginStatus('비밀번호를 입력해 주세요.', 'warning', 'input-login-password');
+    if (!$('login-consent').checked) return setLoginStatus('커뮤니티 안전 규칙과 개인정보 최소 이용 안내를 확인해 주세요.', 'warning', 'login-consent');
+    const account = getAccounts().find((item) => normalizeLoginId(item.loginId) === loginId);
+    if (!account) return setLoginStatus('가입된 아이디를 찾을 수 없습니다. 먼저 회원가입을 완료해 주세요.', 'warning', 'input-login-id');
+    if (!account.nickname) return setLoginStatus('회원가입 후 공개 닉네임 설정을 완료해 주세요.', 'warning', 'input-login-id');
+    let passwordHash;
+    try {
+        passwordHash = await hashSecret(password);
+    } catch {
+        return setLoginStatus('비밀번호를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.', 'warning', 'input-login-password');
+    }
+    if (passwordHash !== account.passwordHash) return setLoginStatus('아이디 또는 비밀번호가 올바르지 않습니다.', 'warning', 'input-login-password');
+    state.user = publicUser({ id: account.id, nickname: account.nickname, icon: '🌱', trustScore: account.trustScore });
     state.filters.ageGroup = 'all';
     localStorage.setItem(USER_KEY, JSON.stringify(state.user));
     closeLogin(); updateNav();
-    setStatus('익명 닉네임으로 로그인했습니다.', 'success');
+    setView('activities', false);
+    setStatus('닉네임으로 로그인되었습니다. 참여할 활동을 찾아보세요.', 'success');
 }
 
 function logout() {
@@ -893,8 +1072,9 @@ function logout() {
 }
 
 function validateActivity(activity) {
-    if (!activity.title || !activity.purpose || !activity.description || !activity.location || !activity.scheduledAt) return '모든 필수 항목을 입력해 주세요.';
-    if (new Date(activity.scheduledAt).getTime() <= Date.now()) return '모임 시간은 현재보다 이후여야 합니다.';
+    if (!activity.title || !activity.purpose || !activity.description || !activity.location || !activity.scheduledAt || !activity.category || !activity.ageGroup) return '모든 필수 항목을 입력해 주세요.';
+    const scheduledTime = new Date(activity.scheduledAt).getTime();
+    if (!Number.isFinite(scheduledTime) || scheduledTime <= Date.now()) return '모임 시간은 현재보다 이후여야 합니다.';
     if (activity.maxParticipants < MIN_PARTICIPANTS || activity.maxParticipants > DEFAULT_MAX_PARTICIPANTS) return '모집 인원은 3명에서 6명 사이여야 합니다.';
     if (/자택|집|호텔|개인s*주소|우리집/i.test(activity.location)) return '공개된 상업·공공장소를 입력해 주세요.';
     return '';
@@ -903,11 +1083,13 @@ function validateActivity(activity) {
 async function handleCreate(event) {
     event.preventDefault();
     if (!state.user) return setStatus('로그인 후 모임을 개설할 수 있습니다.', 'warning');
+    const rawScheduledAt = $('input-time').value;
+    const parsedScheduledAt = rawScheduledAt ? new Date(rawScheduledAt) : null;
     const activity = {
         id: crypto.randomUUID?.() || String(Date.now()),
         title: $('input-title').value.trim(), purpose: $('input-purpose').value.trim(),
         description: $('input-desc').value.trim(), location: $('input-location').value.trim(),
-        scheduledAt: new Date($('input-time').value).toISOString(),
+        scheduledAt: parsedScheduledAt && Number.isFinite(parsedScheduledAt.getTime()) ? parsedScheduledAt.toISOString() : '',
         maxParticipants: Number($('input-limit').value), creatorId: state.user.id, hostTrustScore: state.user.trustScore,
         category: $('input-category').value, categoryFamily: activityFamilyForType($('input-category').value), ageGroup: $('input-age-group').value,
         participants: 1, participantIds: [state.user.id], status: 'pending'
@@ -992,23 +1174,26 @@ function openFeedback(groupId) {
     $('feedback-punctuality').focus();
 }
 
-function closeFeedback() { elements.feedbackModal.classList.add('hidden'); elements.feedbackForm.reset(); }
+function closeFeedback() {
+    elements.feedbackModal.classList.add('hidden');
+    elements.feedbackForm.reset();
+    if (elements.feedbackSubmitStatus) { elements.feedbackSubmitStatus.textContent = ''; elements.feedbackSubmitStatus.dataset.tone = ''; }
+}
 
 function submitFeedback(event) {
     event.preventDefault();
     const groupId = elements.feedbackModal.dataset.groupId;
     const reviews = safeJson(localStorage.getItem(REVIEWS_KEY), []);
     const subjectId = $('feedback-subject').value;
-    if (!subjectId || subjectId === state.user.id) return setStatus('본인을 평가할 수 없습니다.', 'warning');
-    if (reviews.some((review) => review.groupId === groupId && review.reviewerId === state.user.id && review.subjectId === subjectId)) return setStatus('이 참여자에게는 이미 평가를 제출했습니다.', 'warning');
+    if (!subjectId || subjectId === state.user.id) return setFeedbackStatus('평가할 참여자를 선택해 주세요. 본인은 평가할 수 없습니다.', 'warning', 'feedback-subject');
+    if (reviews.some((review) => review.groupId === groupId && review.reviewerId === state.user.id && review.subjectId === subjectId)) return setFeedbackStatus('이 참여자에게는 이미 평가를 제출했습니다.', 'warning', 'feedback-subject');
     const dimensions = ['punctuality', 'courtesy', 'rules'];
     const values = dimensions.map((dimension) => $(`feedback-${dimension}`).value);
     reviews.push({ groupId, reviewerId: state.user.id, subjectId, dimensions: Object.fromEntries(dimensions.map((key, index) => [key, values[index]])), createdAt: new Date().toISOString() });
     localStorage.setItem(REVIEWS_KEY, JSON.stringify(reviews));
     const trust = safeJson(localStorage.getItem(TRUST_KEY), {});
-    const score = Number(trust[subjectId] ?? 36.5);
-    const negative = values.filter((value) => value === 'negative').length;
-    trust[subjectId] = Math.max(0, Math.min(100, score + (negative ? -0.5 * negative : 0.2)));
+    const score = getTrustProjection(subjectId, TRUST_BASELINE);
+    trust[subjectId] = Math.max(0, Math.min(100, score + calculateTrustDelta(values)));
     localStorage.setItem(TRUST_KEY, JSON.stringify(trust));
     closeFeedback(); setStatus('행동 기반 평가가 제출되었습니다.', 'success');
 }
@@ -1058,13 +1243,48 @@ function cancelUnderfilledGroups() {
     if (changed) { persistence.save(); renderGroups(); setStatus('인원 미달 모임이 취소되었습니다.', 'warning'); }
 }
 
-function openCreate() { elements.createModal.classList.remove('hidden'); elements.feedback.classList.add('hidden'); $('input-title').focus(); }
+function viewFromLocation() {
+    const route = window.location.hash.replace(/^#\/?/, '');
+    return ['home', 'activities', 'recommendation', 'board', 'guide'].includes(route) ? route : 'home';
+}
+
+function setView(view, shouldScroll = true, updateUrl = true) {
+    const allowedViews = ['home', 'activities', 'recommendation', 'board', 'guide'];
+    const nextView = allowedViews.includes(view) ? view : 'home';
+    if (updateUrl) {
+        const nextRoute = nextView === 'home' ? '#/' : `#/${nextView}`;
+        if (window.location.hash !== nextRoute) window.history.pushState({ view: nextView }, '', nextRoute);
+    }
+    document.body.dataset.view = nextView;
+    if (elements.recommendationDock) elements.recommendationDock.open = nextView === 'recommendation';
+    elements.viewTabs.forEach((tab) => {
+        if (tab.classList.contains('nav-tab')) tab.classList.toggle('active', tab.dataset.viewTarget === nextView);
+        if (tab.dataset.viewTarget) tab.setAttribute('aria-current', tab.dataset.viewTarget === nextView ? 'page' : 'false');
+    });
+    if (shouldScroll) window.scrollTo({ top: 0, behavior: 'auto' });
+}
+
+function openCreate() {
+    if (!state.user) return openLogin();
+    setView('activities', false);
+    elements.createModal.classList.remove('hidden'); elements.feedback.classList.add('hidden'); $('input-title').focus();
+}
 function closeCreate() { elements.createModal.classList.add('hidden'); elements.form.reset(); elements.feedback.classList.add('hidden'); }
 
 function applyGroupSearch() {
     state.filters.query = elements.search.value.trim();
     renderGroups();
     renderBoard();
+    setStatus(state.filters.query ? `'${state.filters.query}' 검색 결과를 업데이트했어요.` : '전체 활동을 다시 보여드려요.', 'success');
+}
+
+function openConnectionRecommendation(interest = '', comfort = 'any') {
+    setView('recommendation', false);
+    $('input-interest').value = interest;
+    $('input-comfort').value = comfort;
+    elements.recommendationDock.open = true;
+    elements.recommendationDock.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    window.setTimeout(() => $('input-interest').focus(), 250);
 }
 
 function init() {
@@ -1074,8 +1294,8 @@ function init() {
         localStorage.setItem(USER_KEY, JSON.stringify(state.user));
     }
     if (state.user && getPrivateProfile()?.userId === state.user.id) state.filters.ageGroup = 'mine';
-    persistence.load(); loadPosts(); loadNotifications(); renderCategoryOptions(); updateNav(); renderGroups(); renderBoard(); cancelUnderfilledGroups();
-    elements.login.addEventListener('click', openLogin); elements.signup.addEventListener('click', openSignup); elements.closeLogin.addEventListener('click', closeLogin); elements.loginForm.addEventListener('submit', login); elements.closeSignup.addEventListener('click', closeSignup); elements.signupForm.addEventListener('submit', submitSignup); elements.nicknameSetupForm.addEventListener('submit', submitNicknameSetup); elements.profileButton.addEventListener('click', openProfile); elements.closeProfile.addEventListener('click', closeProfile); elements.profileForm.addEventListener('submit', submitProfile); elements.notificationsButton.addEventListener('click', openNotifications); elements.closeNotifications.addEventListener('click', closeNotifications); $('btn-check-id').addEventListener('click', checkSignupId); $('signup-id').addEventListener('input', () => { signupState.idAvailable = false; signupState.idCheckedId = ''; $('signup-id-status').textContent = '아이디가 변경되었습니다. 다시 중복 확인해 주세요.'; $('signup-id-status').dataset.tone = 'info'; }); $('signup-age').addEventListener('input', enforceSignupAge); $('btn-send-verification').addEventListener('click', sendSignupVerification); $('signup-verification-contact').addEventListener('input', resetSignupVerification); $('signup-verification-method').addEventListener('change', resetSignupVerification); $('btn-complete-verification').addEventListener('click', completeSignupVerification); elements.logout.addEventListener('click', logout);
+    persistence.load(); loadPosts(); loadNotifications(); renderCategoryOptions(); migrateCurrentUserAccount(state.user); updateNav(); renderGroups(); renderBoard(); cancelUnderfilledGroups(); setView(viewFromLocation(), false, false);
+    elements.profileButton.addEventListener('click', openProfile); elements.closeProfile.addEventListener('click', closeProfile); elements.profileForm.addEventListener('submit', submitProfile); elements.notificationsButton.addEventListener('click', openNotifications); elements.closeNotifications.addEventListener('click', closeNotifications); $('btn-check-id').addEventListener('click', checkSignupId); $('signup-id').addEventListener('input', () => { signupState.idAvailable = false; signupState.idCheckedId = ''; $('signup-id').dataset.checkedId = ''; $('signup-id').dataset.idAvailable = 'false'; $('signup-id-status').textContent = '아이디가 변경되었습니다. 다시 중복 확인해 주세요.'; $('signup-id-status').dataset.tone = 'info'; }); $('signup-age').addEventListener('input', enforceSignupAge); $('btn-send-verification').addEventListener('click', sendSignupVerification); $('signup-verification-contact').addEventListener('input', resetSignupVerification); $('signup-verification-method').addEventListener('change', resetSignupVerification); $('btn-complete-verification').addEventListener('click', completeSignupVerification); elements.logout.addEventListener('click', logout);
     elements.create.addEventListener('click', openCreate); elements.closeCreate.addEventListener('click', closeCreate);
     elements.form.addEventListener('submit', handleCreate);
     elements.closeFeedback.addEventListener('click', closeFeedback);
@@ -1084,13 +1304,33 @@ function init() {
     elements.search.addEventListener('input', (event) => { state.filters.query = event.target.value; renderGroups(); renderBoard(); });
     elements.applySearch.addEventListener('click', applyGroupSearch);
     elements.createMain.addEventListener('click', openCreate);
-    elements.createHero.addEventListener('click', openCreate);
     elements.createGuide.addEventListener('click', openCreate);
+    elements.navCreate.addEventListener('click', openCreate);
     elements.openChat.addEventListener('click', openChatbot); elements.closeChat.addEventListener('click', closeChatbot); elements.chatForm.addEventListener('submit', handleChatbot);
+    window.addEventListener('hashchange', () => setView(viewFromLocation(), true, false));
+    window.addEventListener('popstate', () => setView(viewFromLocation(), true, false));
     window.addEventListener('storage', (event) => { if (event.key === GROUPS_KEY) { persistence.load(); renderGroups(); } if (event.key === NOTIFICATIONS_KEY) { loadNotifications(); renderNotifications(); } });
     window.addEventListener('dg:groups-changed', renderGroups);
     window.setInterval(cancelUnderfilledGroups, 30_000);
 }
+
+document.addEventListener('click', (event) => {
+    const button = event.target.closest?.('button');
+    if (button?.id === 'btn-login') { event.preventDefault(); openLogin(); return; }
+    if (button?.id === 'btn-signup') { event.preventDefault(); openSignup(); return; }
+    if (button?.id === 'btn-close-login') { event.preventDefault(); closeLogin(); return; }
+    if (button?.id === 'btn-close-signup') { event.preventDefault(); closeSignup(); return; }
+    const target = event.target.closest?.('[data-view-target]');
+    if (!target || target.id === 'nav-create') return;
+    event.preventDefault();
+    setView(target.dataset.viewTarget);
+});
+
+document.addEventListener('submit', (event) => {
+    if (event.target.id === 'form-login') return login(event);
+    if (event.target.id === 'form-signup') return submitSignup(event);
+    if (event.target.id === 'form-nickname-setup') return submitNicknameSetup(event);
+});
 
 document.addEventListener('DOMContentLoaded', init);
 window.openFeedback = openFeedback;

@@ -104,7 +104,7 @@ uses the adapter’s deterministic mock implementation.
 
 ## Phase 8: Convergence
 
-- [ ] T031 Add a protected server-side safety-review endpoint that owns provider credentials and returns the documented review contract per Constitution IV and plan: protected server boundary (contradicts)
+- [x] T031 Add a protected server-side safety-review endpoint that owns provider credentials and returns the documented review contract per Constitution IV and plan: protected server boundary (Censorship_Agent gateway)
 - [ ] T032 Move the two-hour underfilled-activity cancellation invariant to a scheduled server job or database function and publish its result through the persistence boundary per FR-006 and Constitution III (partial)
 - [ ] T033 Implement Supabase Auth, activity persistence, unique participation/capacity enforcement, and Realtime subscription behind the adapter per plan: Supabase dependencies and SC-002/SC-004 (missing)
 - [ ] T034 Re-review edited activity content before it remains recruiting and expose the correction path per FR-013 (missing)

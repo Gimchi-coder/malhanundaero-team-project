@@ -46,10 +46,17 @@ git diff --check
 ## n8n 실행
 
 1. n8n에서 `n8n/workflows/activity-safety-and-recommendation.json`을 import한다.
-2. 보호된 의미 분류 endpoint를 n8n 환경변수로 설정한다.
-3. `specs/001-dongne-gwangjang/contracts/automation.md`의 입력을 webhook으로 전송한다.
-4. 안전한 입력, 위험 입력, 우회 입력, provider 실패 입력을 각각 재생한다.
-5. 결정·신뢰도·안내·재시도·지연을 기록한다.
+2. `/Users/cw/Downloads/Censorship_Agent`에서 보호된 게이트웨이를 실행한다.
+   `OPENAI_API_KEY`, `MODERATION_USE_AI=1`, `MODERATION_GATEWAY_TOKEN`은 쉘 환경변수로만
+   설정한다.
+3. n8n의 `SAFETY_CLASSIFIER_URL`을 게이트웨이의 `/moderate` 주소로 설정하고,
+   n8n에도 같은 `MODERATION_GATEWAY_TOKEN`을 설정한다.
+4. `specs/001-dongne-gwangjang/contracts/automation.md`의 입력을 webhook으로 전송한다.
+5. 안전한 입력, 위험 입력, 우회 입력, provider 실패 입력을 각각 재생한다.
+6. 결정·신뢰도·안내·재시도·지연을 기록한다.
+
+게이트웨이는 AI가 게시물을 직접 삭제하지 않도록 설계되어 있다. `held`는 공개 전 게시
+보류이며, `manual_review`는 운영자 검토 대상이다. 영구 삭제는 별도 승인 절차가 필요하다.
 
 ## 문제 발생 시
 

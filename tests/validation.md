@@ -43,6 +43,22 @@ context routing, confidence bands, and a protected endpoint adapter. The local f
 explicitly labeled as offline policy behavior; it is not presented as a provider-backed AI
 decision.
 
+### Protected Censorship_Agent gateway evidence
+
+Run the gateway from `/Users/cw/Downloads/Censorship_Agent` with `MODERATION_USE_AI=0` for
+deterministic contract replay, or set `MODERATION_USE_AI=1` and provide `OPENAI_API_KEY` only in
+the server environment for semantic classification. The observed local responses were:
+
+| Input | Expected | Observed |
+|---|---|---|
+| 공개 장소 독서 모임 | `approved` | `approved` |
+| `ㄷㅂ사주실분` 우회 표현 | `held` + danger category | `held` + `danger_or_illegal_activity` |
+| AI 인증 실패 | never approved | `manual_review` |
+
+The gateway maps `allow → approved`, `revise/block → held`, and `review → manual_review`.
+It does not permanently delete content; an already published item requires an explicit operator
+approval step.
+
 Input guardrails reject system-rule override requests before an AI call and mask email/phone
 patterns before operational records are written.
 

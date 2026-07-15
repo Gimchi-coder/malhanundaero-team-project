@@ -30,6 +30,15 @@
         "method": "POST",
         "url": "={{$env.SAFETY_CLASSIFIER_URL}}",
         "sendBody": true,
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{$env.MODERATION_GATEWAY_TOKEN ? 'Bearer ' + $env.MODERATION_GATEWAY_TOKEN : ''}}"
+            }
+          ]
+        },
         "specifyBody": "json",
         "jsonBody": "={{ { requestId: $json.requestId, operation: $json.operation, text: $json.normalizedText, activity: $json.activity, preferences: $json.preferences } }}",
         "options": { "timeout": 8000 },

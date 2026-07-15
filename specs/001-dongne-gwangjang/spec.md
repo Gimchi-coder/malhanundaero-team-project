@@ -229,8 +229,10 @@ results and operational fields, and compares a baseline with a revised prompt or
 ### Additional Functional Requirements
 
 - **FR-015**: The service MUST provide an activity recommendation based on explicit user
-  preferences and activity attributes, with a user-readable reason and no person-to-person
-  matching signal.
+  preferences and retrieved recruiting-activity context, with a user-readable reason and no
+  person-to-person matching signal. The protected recommendation path SHOULD use RAG over
+  activity purpose, description, category, schedule, public location, capacity, and comfort
+  metadata; the local prototype MUST label its deterministic grounded fallback.
 - **FR-016**: The safety workflow MUST combine deterministic normalization/rules with semantic
   intent classification for dating, harassment, scams, sales, investment solicitation,
   proselytizing, and unrelated recruitment.
