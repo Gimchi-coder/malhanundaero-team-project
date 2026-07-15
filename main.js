@@ -10,6 +10,7 @@ const GROUPS_KEY = 'dg_groups_v2';
 const USER_KEY = 'dg_user';
 const ACCOUNTS_KEY = 'dg_accounts_v1';
 const PRIVATE_PROFILE_KEY = 'dg_private_profile_v1';
+const PRIVATE_PROFILES_KEY = 'dg_private_profiles_v1';
 const REPORTS_KEY = 'dg_reports_v1';
 const REVIEWS_KEY = 'dg_reviews_v1';
 const TRUST_KEY = 'dg_trust_projection_v1';
@@ -42,6 +43,9 @@ const elements = {
     notificationList: $('notification-list'),
     loginModal: $('modal-login'),
     closeLogin: $('btn-close-login'),
+    recoveryModal: $('modal-account-recovery'),
+    closeRecovery: $('btn-close-recovery'),
+    recoveryForm: $('form-account-recovery'),
     loginForm: $('form-login'),
     loginSubmitStatus: $('login-submit-status'),
     signupModal: $('modal-signup'),
@@ -170,6 +174,19 @@ function getPrivateProfile() {
     return safeJson(localStorage.getItem(PRIVATE_PROFILE_KEY), null);
 }
 
+function getPrivateProfiles() {
+    const profiles = safeJson(localStorage.getItem(PRIVATE_PROFILES_KEY), []);
+    const list = Array.isArray(profiles) ? profiles : [];
+    const current = getPrivateProfile();
+    if (current && !list.some((profile) => profile.userId === current.userId)) list.push(current);
+    return list;
+}
+
+function normalizeContact(contact) {
+    const value = String(contact || '').normalize('NFKC').trim().toLowerCase();
+    return /^[-+\d\s()]+$/.test(value) ? value.replace(/\D/g, '') : value;
+}
+
 function getViewerAgeGroup() {
     return getPrivateProfile()?.ageGroup || 'all';
 }
@@ -186,7 +203,7 @@ function normalizedTrustScore(score) {
 }
 
 function getTrustProjection(userId, fallback = TRUST_BASELINE) {
-    const trust = safeJson(localStorage.getItem(TRUST_KEY), {});
+    const trust = safeJson(localStorage.getItem(TRUST_KEY), {}) || {};
     return normalizedTrustScore(trust[String(userId)] ?? fallback);
 }
 
@@ -846,6 +863,10 @@ function closeSignup() {
     elements.signupSubmitStatus.dataset.tone = '';
     $('signup-age-status').textContent = '만 20세 이상만 가입할 수 있어요.';
     $('signup-age-status').dataset.tone = '';
+    $('signup-password-status').textContent = '영문, 숫자, 특수문자를 포함해 8자 이상 입력해 주세요.';
+    $('signup-password-status').dataset.tone = '';
+    $('signup-password-confirm-status').textContent = '비밀번호를 한 번 더 입력해 주세요.';
+    $('signup-password-confirm-status').dataset.tone = '';
     $('signup-verification-status').textContent = '개발용 인증 흐름입니다.';
 }
 
@@ -916,7 +937,7 @@ function checkSignupId() {
         status.dataset.tone = 'warning';
         return;
     }
-    const usedIds = safeJson(localStorage.getItem('dg_signup_ids_v1'), []);
+    const usedIds = safeJson(localStorage.getItem('dg_signup_ids_v1'), []) || [];
     const usedId = Array.isArray(usedIds) && usedIds.some((usedIdValue) => normalizeLoginId(usedIdValue) === id);
     const accountIdUsed = getAccounts().some((account) => normalizeLoginId(account.loginId) === id);
     signupState.idAvailable = !usedId && !accountIdUsed;
@@ -962,6 +983,91 @@ function enforceSignupAge(event) {
     $('signup-age-status').dataset.tone = '';
 }
 
+function openRecovery(mode = 'id') {
+    elements.recoveryModal.classList.remove('hidden');
+    $('recovery-mode').value = mode;
+    updateRecoveryMode();
+    $('recovery-contact').focus();
+}
+
+function closeRecovery() {
+    elements.recoveryModal.classList.add('hidden');
+    elements.recoveryForm.reset();
+    $('recovery-status').textContent = '';
+    $('recovery-status').dataset.tone = '';
+    updateRecoveryMode();
+}
+
+function updateRecoveryMode() {
+    const passwordMode = $('recovery-mode').value === 'password';
+    $('recovery-title').textContent = passwordMode ? '비밀번호 찾기' : '아이디 찾기';
+    $('recovery-id-group').classList.toggle('hidden', !passwordMode);
+    $('recovery-password-group').classList.toggle('hidden', !passwordMode);
+    $('btn-submit-recovery').textContent = passwordMode ? '비밀번호 변경' : '아이디 확인';
+}
+
+function setRecoveryStatus(message, tone = 'warning') {
+    $('recovery-status').textContent = message;
+    $('recovery-status').dataset.tone = tone;
+}
+
+function isValidPassword(password) {
+    return password.length >= 8 && /[A-Za-z]/.test(password) && /[0-9]/.test(password) && /[^A-Za-z0-9\s]/.test(password);
+}
+
+async function submitAccountRecovery(event) {
+    event.preventDefault();
+    const mode = $('recovery-mode').value;
+    const contact = normalizeContact($('recovery-contact').value);
+    const code = $('recovery-code').value.trim();
+    if (!contact) return setRecoveryStatus('가입 시 입력한 연락처를 입력해 주세요.');
+    if (code !== '123456') return setRecoveryStatus('개발용 인증번호는 123456입니다.');
+    const profiles = getPrivateProfiles();
+    const profile = profiles.find((item) => normalizeContact(item.verificationContact || item.phone) === contact);
+    if (!profile) return setRecoveryStatus('일치하는 가입 연락처를 찾을 수 없습니다.');
+    if (mode === 'id') return setRecoveryStatus(`가입된 아이디는 ${profile.signupId}입니다.`, 'success');
+    const loginId = normalizeLoginId($('recovery-login-id').value);
+    if (!loginId || normalizeLoginId(profile.signupId) !== loginId) return setRecoveryStatus('아이디와 가입 연락처가 일치하지 않습니다.');
+    const password = $('recovery-password').value;
+    if (!isValidPassword(password)) return setRecoveryStatus('새 비밀번호는 영문, 숫자, 특수문자를 포함해 8자 이상 입력해 주세요.');
+    if (password !== $('recovery-password-confirm').value) return setRecoveryStatus('새 비밀번호와 확인값이 일치하지 않습니다.');
+    const account = getAccounts().find((item) => normalizeLoginId(item.loginId) === loginId);
+    if (!account) return setRecoveryStatus('가입된 아이디를 찾을 수 없습니다.');
+    account.passwordHash = await hashSecret(password);
+    saveAccounts(getAccounts().map((item) => item.id === account.id ? account : item));
+    setRecoveryStatus('개발용 비밀번호 변경이 완료되었습니다. 로그인해 주세요.', 'success');
+}
+
+function validateSignupPassword(event) {
+    const password = event.target.value;
+    const status = $('signup-password-status');
+    if (!password) {
+        status.textContent = '영문, 숫자, 특수문자를 포함해 8자 이상 입력해 주세요.';
+        status.dataset.tone = '';
+        return;
+    }
+    const valid = isValidPassword(password);
+    status.textContent = valid
+        ? '사용 가능한 비밀번호입니다.'
+        : '영문, 숫자, 특수문자를 모두 포함해 8자 이상 입력해 주세요.';
+    status.dataset.tone = valid ? 'success' : 'warning';
+    validateSignupPasswordMatch();
+}
+
+function validateSignupPasswordMatch() {
+    const password = $('signup-password').value;
+    const confirmation = $('signup-password-confirm').value;
+    const status = $('signup-password-confirm-status');
+    if (!confirmation) {
+        status.textContent = '비밀번호를 한 번 더 입력해 주세요.';
+        status.dataset.tone = '';
+        return;
+    }
+    const matches = password === confirmation;
+    status.textContent = matches ? '비밀번호가 일치합니다.' : '비밀번호가 일치하지 않습니다.';
+    status.dataset.tone = matches ? 'success' : 'warning';
+}
+
 function completeSignupVerification() {
     const code = $('signup-verification-code').value.trim();
     if (!signupState.verificationComplete) {
@@ -1004,14 +1110,16 @@ async function submitSignup(event) {
     const password = $('signup-password').value;
     const idInput = $('signup-id');
     const id = idInput.value.trim().toLowerCase();
-    if (password.length < 8) return setSignupStatus('비밀번호는 8자 이상 입력해 주세요.', 'warning', 'signup-password');
+    if (!isValidPassword(password)) {
+        return setSignupStatus('비밀번호는 영문, 숫자, 특수문자를 모두 포함해 8자 이상 입력해 주세요.', 'warning', 'signup-password');
+    }
+    if (password !== $('signup-password-confirm').value) return setSignupStatus('비밀번호와 확인값이 서로 일치하지 않습니다.', 'warning', 'signup-password-confirm');
     if (idInput.dataset.checkedId !== id) return setSignupStatus('현재 아이디의 중복 확인을 먼저 완료해 주세요.', 'warning', 'signup-id');
     if (idInput.dataset.idAvailable !== 'true') return setSignupStatus('사용할 수 없는 아이디입니다. 다른 아이디를 입력해 주세요.', 'warning', 'signup-id');
-    const usedIds = safeJson(localStorage.getItem('dg_signup_ids_v1'), []);
+    const usedIds = safeJson(localStorage.getItem('dg_signup_ids_v1'), []) || [];
     const usedId = Array.isArray(usedIds) && usedIds.some((usedIdValue) => normalizeLoginId(usedIdValue) === id);
     const accountIdUsed = getAccounts().some((account) => normalizeLoginId(account.loginId) === id);
     if (usedId || accountIdUsed) return setSignupStatus('이미 사용 중인 아이디입니다. 다른 아이디를 입력해 주세요.', 'warning', 'signup-id');
-    if (password !== $('signup-password-confirm').value) return setSignupStatus('비밀번호와 확인값이 서로 일치하지 않습니다.', 'warning', 'signup-password-confirm');
     if (!signupState.verificationComplete) return setSignupStatus('인증하기와 인증 확인을 완료해 주세요.', 'warning', 'signup-verification-code');
     let passwordHash;
     try {
@@ -1022,17 +1130,21 @@ async function submitSignup(event) {
     localStorage.setItem('dg_signup_ids_v1', JSON.stringify([...new Set([...usedIds, id.toLowerCase()])]));
     state.pendingSignupId = crypto.randomUUID?.() || String(Date.now());
     upsertAccount({ id: state.pendingSignupId, loginId: id, passwordHash, nickname: '', trustScore: TRUST_BASELINE });
-    localStorage.setItem(PRIVATE_PROFILE_KEY, JSON.stringify({
+    const privateProfile = {
         userId: state.pendingSignupId,
         name: $('signup-name').value.trim(),
         gender: $('signup-gender').value,
         age: Number($('signup-age').value),
         ageGroup: ageGroupFromAge($('signup-age').value),
         phone: $('signup-phone').value.trim(),
+        verificationContact: $('signup-verification-contact').value.trim(),
         signupId: id,
         verificationMethod: $('signup-verification-method').value,
         marketingConsent: $('signup-marketing-consent').checked
-    }));
+    };
+    localStorage.setItem(PRIVATE_PROFILE_KEY, JSON.stringify(privateProfile));
+    const profiles = getPrivateProfiles().filter((profile) => profile.userId !== privateProfile.userId);
+    localStorage.setItem(PRIVATE_PROFILES_KEY, JSON.stringify([...profiles, privateProfile]));
     closeSignup();
     openNicknameSetup();
     setStatus('회원가입이 완료되었습니다. 공개 닉네임을 설정해 주세요.', 'success');
@@ -1288,6 +1400,7 @@ function openConnectionRecommendation(interest = '', comfort = 'any') {
 }
 
 function init() {
+    $('recovery-mode').addEventListener('change', updateRecoveryMode);
     state.user = publicUser(safeJson(localStorage.getItem(USER_KEY), null));
     if (state.user && state.user.trustScore === 36.5) {
         state.user.trustScore = 50;
@@ -1295,7 +1408,7 @@ function init() {
     }
     if (state.user && getPrivateProfile()?.userId === state.user.id) state.filters.ageGroup = 'mine';
     persistence.load(); loadPosts(); loadNotifications(); renderCategoryOptions(); migrateCurrentUserAccount(state.user); updateNav(); renderGroups(); renderBoard(); cancelUnderfilledGroups(); setView(viewFromLocation(), false, false);
-    elements.profileButton.addEventListener('click', openProfile); elements.closeProfile.addEventListener('click', closeProfile); elements.profileForm.addEventListener('submit', submitProfile); elements.notificationsButton.addEventListener('click', openNotifications); elements.closeNotifications.addEventListener('click', closeNotifications); $('btn-check-id').addEventListener('click', checkSignupId); $('signup-id').addEventListener('input', () => { signupState.idAvailable = false; signupState.idCheckedId = ''; $('signup-id').dataset.checkedId = ''; $('signup-id').dataset.idAvailable = 'false'; $('signup-id-status').textContent = '아이디가 변경되었습니다. 다시 중복 확인해 주세요.'; $('signup-id-status').dataset.tone = 'info'; }); $('signup-age').addEventListener('input', enforceSignupAge); $('btn-send-verification').addEventListener('click', sendSignupVerification); $('signup-verification-contact').addEventListener('input', resetSignupVerification); $('signup-verification-method').addEventListener('change', resetSignupVerification); $('btn-complete-verification').addEventListener('click', completeSignupVerification); elements.logout.addEventListener('click', logout);
+    elements.profileButton.addEventListener('click', openProfile); elements.closeProfile.addEventListener('click', closeProfile); elements.profileForm.addEventListener('submit', submitProfile); elements.notificationsButton.addEventListener('click', openNotifications); elements.closeNotifications.addEventListener('click', closeNotifications); $('btn-check-id').addEventListener('click', checkSignupId); $('signup-id').addEventListener('input', () => { signupState.idAvailable = false; signupState.idCheckedId = ''; $('signup-id').dataset.checkedId = ''; $('signup-id').dataset.idAvailable = 'false'; $('signup-id-status').textContent = '아이디가 변경되었습니다. 다시 중복 확인해 주세요.'; $('signup-id-status').dataset.tone = 'info'; }); $('signup-password').addEventListener('input', validateSignupPassword); $('signup-password-confirm').addEventListener('input', validateSignupPasswordMatch); $('signup-age').addEventListener('input', enforceSignupAge); $('btn-send-verification').addEventListener('click', sendSignupVerification); $('signup-verification-contact').addEventListener('input', resetSignupVerification); $('signup-verification-method').addEventListener('change', resetSignupVerification); $('btn-complete-verification').addEventListener('click', completeSignupVerification); elements.logout.addEventListener('click', logout);
     elements.create.addEventListener('click', openCreate); elements.closeCreate.addEventListener('click', closeCreate);
     elements.form.addEventListener('submit', handleCreate);
     elements.closeFeedback.addEventListener('click', closeFeedback);
@@ -1320,6 +1433,9 @@ document.addEventListener('click', (event) => {
     if (button?.id === 'btn-signup') { event.preventDefault(); openSignup(); return; }
     if (button?.id === 'btn-close-login') { event.preventDefault(); closeLogin(); return; }
     if (button?.id === 'btn-close-signup') { event.preventDefault(); closeSignup(); return; }
+    if (button?.id === 'btn-find-id') { event.preventDefault(); closeLogin(); openRecovery('id'); return; }
+    if (button?.id === 'btn-find-password') { event.preventDefault(); closeLogin(); openRecovery('password'); return; }
+    if (button?.id === 'btn-close-recovery') { event.preventDefault(); closeRecovery(); return; }
     const target = event.target.closest?.('[data-view-target]');
     if (!target || target.id === 'nav-create') return;
     event.preventDefault();
@@ -1329,6 +1445,7 @@ document.addEventListener('click', (event) => {
 document.addEventListener('submit', (event) => {
     if (event.target.id === 'form-login') return login(event);
     if (event.target.id === 'form-signup') return submitSignup(event);
+    if (event.target.id === 'form-account-recovery') return submitAccountRecovery(event);
     if (event.target.id === 'form-nickname-setup') return submitNicknameSetup(event);
 });
 
