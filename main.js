@@ -19,7 +19,7 @@ const ACTIVITY_CHAT_KEY = 'dg_activity_chat_v1';
 const TRUST_KEY = 'dg_trust_projection_v1';
 const NOTIFICATIONS_KEY = 'dg_notifications_v1';
 const OPERATIONS_KEY = 'dg_operations_v1';
-const RECOMMENDATION_CACHE_KEY = 'dg_recommendation_cache_v1';
+const RECOMMENDATION_CACHE_KEY = 'dg_recommendation_cache_v2';
 const RECOMMENDATION_CACHE_STATS_KEY = 'dg_recommendation_cache_stats_v1';
 const ACTIVITY_HISTORY_KEY = 'dg_activity_history_v1';
 const ACTIVITY_SETTINGS_KEY = 'dg_activity_settings_v1';
@@ -113,8 +113,8 @@ elements.recommendationStatus = $('recommendation-status');
 elements.recommendationList = $('recommendation-list');
 elements.search = $('input-group-search');
 elements.applySearch = $('btn-apply-search');
-elements.recommendationHero = $('btn-recommendation-hero');
 elements.locationSettingsButton = $('btn-location-settings');
+elements.locationQuickSetting = document.querySelector('.location-quick-setting');
 elements.locationSettingsPopover = $('location-settings-popover');
 elements.locationSettingsForm = $('form-location-settings');
 elements.locationSettingsStatus = $('location-settings-status');
@@ -970,6 +970,21 @@ const ACTIVITY_EXAMPLES = [
     { family: 'other', title: '계절 꽃 한 송이 고르기', description: '가까운 동네에서 취향을 천천히 나눠요.' }
 ];
 
+const DEMO_PAST_ACTIVITY_HISTORY = [
+    { id: 'quiet-reading', title: '퇴근 후 조용한 독서', category: '공부·자기계발', purpose: '각자 책을 읽고 한 줄 감상 나누기', feelingLabel: '편안하게 참여함', revisitLabel: '다시 참여하고 싶음' },
+    { id: 'coding', title: '주말 코딩 한 시간', category: '공부·자기계발', purpose: '각자 할 일을 가져와 함께 집중하기', feelingLabel: '편안하게 참여함', revisitLabel: '다시 참여하고 싶음' },
+    { id: 'photo-walk', title: '동네 사진 산책', category: '취미', purpose: '휴대폰으로 동네 장면을 천천히 기록하기', feelingLabel: '편안하게 참여함', revisitLabel: '다시 참여하고 싶음' },
+    { id: 'drawing', title: '카페에서 가벼운 드로잉', category: '취미', purpose: '평가 없이 각자 그림을 그리기', feelingLabel: '조금 어색했지만 괜찮았음', revisitLabel: '관심은 있지만 잠시 쉬고 싶음' },
+    { id: 'walk', title: '천천히 동네 한 바퀴', category: '운동', purpose: '속도보다 함께 걷는 시간 보내기', feelingLabel: '편안하게 참여함', revisitLabel: '다시 참여하고 싶음' },
+    { id: 'yoga', title: '초보 저녁 요가', category: '운동', purpose: '몸을 천천히 풀며 긴장 덜어내기', feelingLabel: '다음에는 더 천천히 참여하고 싶음', revisitLabel: '관심은 있지만 잠시 쉬고 싶음' },
+    { id: 'coffee', title: '커피 한 잔과 짧은 안부', category: '친목', purpose: '한 시간만 부담 없이 안부 나누기', feelingLabel: '조금 어색했지만 괜찮았음', revisitLabel: '다시 참여하고 싶음' },
+    { id: 'coop-game', title: '협동 게임 한 판', category: '게임', purpose: '승패보다 함께 규칙을 익히기', feelingLabel: '편안하게 참여함', revisitLabel: '다시 참여하고 싶음' },
+    { id: 'exhibition', title: '전시 보고 한 줄 감상', category: '문화생활', purpose: '각자 관람하고 짧게 감상 나누기', feelingLabel: '편안하게 참여함', revisitLabel: '다시 참여하고 싶음' },
+    { id: 'museum', title: '동네 박물관 천천히 보기', category: '문화생활', purpose: '말이 적어도 괜찮은 관람 모임', feelingLabel: '편안하게 참여함', revisitLabel: '다시 참여하고 싶음' },
+    { id: 'plogging', title: '주말 공원 플로깅', category: '봉사·사회활동', purpose: '걸으며 작은 쓰레기를 함께 줍기', feelingLabel: '조금 어색했지만 괜찮았음', revisitLabel: '관심은 있지만 잠시 쉬고 싶음' },
+    { id: 'small-project', title: '작은 앱 아이디어 모임', category: '프로젝트', purpose: '완성보다 첫 단계를 함께 정하기', feelingLabel: '다음에는 더 천천히 참여하고 싶음', revisitLabel: '다시 참여하고 싶음' }
+];
+
 function activityFamilyForType(type) {
     return ACTIVITY_FAMILIES.find((family) => family.match.test(String(type || '')))?.id || 'other';
 }
@@ -1563,6 +1578,43 @@ function markActivityCompleted(groupId) {
     renderGroups();
     renderHistory();
     setStatus(`'${group.title}' 활동을 참여 완료로 기록했습니다. 이제 활동 후 평가를 남겨 보세요.`, 'success');
+    window.setTimeout(() => openFeedback(group.id), 0);
+}
+
+function startCompletionExample() {
+    if (!state.user) return openLogin();
+    const id = `history-example:${state.user.id}`;
+    if (state.groups.some((group) => group.id === id)) return setStatus('예시 활동이 이미 이전 참여 이력에 있어요.', 'info');
+    const group = {
+        id, title: '예시 · 동네 사진 산책', purpose: '지난 활동을 완료로 기록해 보는 예시 모임',
+        description: '실제 모집이 아닌 활동 기록 기능 안내용 예시입니다.', location: '망원 한강공원 입구',
+        scheduledAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), status: 'recruiting',
+        participants: 1, maxParticipants: 4, ageGroup: 'all', category: '사진 산책', hostTrustScore: TRUST_BASELINE,
+        conversationLevel: 'quiet', beginnerFriendly: true, durationMinutes: 60, creatorId: 'history-example', participantIds: [state.user.id]
+    };
+    ensureGroupMetadata(group);
+    state.groups.push(group);
+    state.joinedGroupIds.add(group.id);
+    upsertActivityHistory('joined', group);
+    markActivityCompleted(group.id);
+}
+
+function appendCompletionExample(container) {
+    if (!container || !state.user) return;
+    const card = document.createElement('article');
+    card.className = 'history-card history-completion-example';
+    const header = document.createElement('div');
+    header.className = 'history-card-header';
+    header.append(createText('span', '예시 · 일정 종료', 'history-status history-status-complete'), createText('span', '어제', 'card-meta'));
+    card.append(header, createText('span', '활동 후 기록 안내', 'category-badge'), createText('h3', '지난 활동을 완료로 기록해 보기'), createText('p', '날짜가 지난 모임은 참여 완료로 기록한 뒤 느낌·재참여 의향·행동 평점을 남길 수 있어요.', 'card-purpose'));
+    const actions = document.createElement('div');
+    actions.className = 'card-actions';
+    const button = createText('button', '참여 완료 기록 예시', 'btn-primary btn-small');
+    button.type = 'button';
+    button.addEventListener('click', startCompletionExample);
+    actions.append(button);
+    card.append(actions);
+    container.append(card);
 }
 
 function historyGroupFromRecord(record) {
@@ -1576,12 +1628,35 @@ function historyGroupFromRecord(record) {
     });
 }
 
+function demoPastHistoryGroups() {
+    return DEMO_PAST_ACTIVITY_HISTORY.map((record, index) => ensureGroupMetadata({
+        id: `demo-past:${record.id}`, title: record.title, purpose: record.purpose, description: record.purpose,
+        location: ['마포구', '망원동', '합정동', '연남동'][index % 4],
+        scheduledAt: new Date(Date.now() - (index + 2) * 7 * 24 * 60 * 60 * 1000).toISOString(),
+        status: 'completed', participants: 4, maxParticipants: 6, ageGroup: 'all', category: record.category,
+        hostTrustScore: TRUST_BASELINE + (index % 5), conversationLevel: index % 3 === 0 ? 'quiet' : 'light_conversation',
+        beginnerFriendly: true, durationMinutes: 60, creatorId: 'rag-history-demo', participantIds: [], isDemoHistory: true,
+        demoCheckin: { feelingLabel: record.feelingLabel, revisitLabel: record.revisitLabel }
+    }));
+}
+
+function recommendationHistoryProfile() {
+    const checkins = getConnectionCheckins();
+    const actual = state.user ? getActivityHistory().joined.map(historyGroupFromRecord).filter(isActivityCompleted).map((group) => {
+        const checkin = checkins.find((item) => String(item.groupId) === String(group.id) && item.userId === state.user.id);
+        return { title: group.title, category: group.category, purpose: group.purpose, feelingLabel: checkin?.feelingLabel || '', revisitLabel: checkin?.revisitLabel || '' };
+    }) : [];
+    const examples = DEMO_PAST_ACTIVITY_HISTORY.map(({ title, category, purpose, feelingLabel, revisitLabel }) => ({ title, category, purpose, feelingLabel, revisitLabel }));
+    const records = [...actual, ...examples].slice(0, 20);
+    const historyContext = records.map((record) => `${record.category}: ${record.title} · ${record.purpose} · ${record.feelingLabel} · ${record.revisitLabel}`).join('\n').slice(0, 1200);
+    return { historyContext, historyCount: records.length, actualHistoryCount: actual.length };
+}
+
 function renderHistoryGroupList(container, groups, type, emptyMessage, checkins) {
     if (!container) return;
     container.replaceChildren();
     if (!groups.length) {
         container.append(createText('p', emptyMessage, 'empty-history'));
-        return;
     }
     const sorted = [...groups].sort((a, b) => {
         const left = new Date(a.scheduledAt).getTime();
@@ -1591,7 +1666,7 @@ function renderHistoryGroupList(container, groups, type, emptyMessage, checkins)
     sorted.forEach((group) => {
         ensureGroupMetadata(group);
         const completedActivity = isActivityCompleted(group);
-        const checkin = checkins.find((item) => String(item.groupId) === String(group.id) && item.userId === state.user?.id);
+        const checkin = group.demoCheckin || checkins.find((item) => String(item.groupId) === String(group.id) && item.userId === state.user?.id);
         const card = document.createElement('article');
         card.className = 'history-card';
         const header = document.createElement('div');
@@ -1621,15 +1696,17 @@ function renderHistoryGroupList(container, groups, type, emptyMessage, checkins)
             complete.addEventListener('click', () => markActivityCompleted(group.id));
             actions.append(complete);
         }
-        if (type === 'past') {
+        if (type === 'past' && !group.isDemoHistory) {
             const evaluate = document.createElement('button');
             evaluate.type = 'button'; evaluate.className = 'btn-primary btn-small'; evaluate.textContent = checkin ? '기록 다시 보기' : '활동 후 평가하기';
             evaluate.addEventListener('click', () => openFeedback(group.id));
             actions.append(evaluate);
         }
+        if (group.isDemoHistory) card.append(createText('small', 'RAG 시연용 이전 참여 이력 예시', 'recommendation-source'));
         if (actions.childElementCount) card.append(actions);
         container.append(card);
     });
+    if (type === 'joined' && state.user && !state.groups.some((group) => group.id === `history-example:${state.user.id}`)) appendCompletionExample(container);
 }
 
 function setHistoryTab(tab) {
@@ -1648,10 +1725,11 @@ function renderHistory() {
     const history = state.user ? getActivityHistory() : emptyActivityHistory();
     const joinedGroups = history.joined.map(historyGroupFromRecord);
     const createdGroups = history.created.map(historyGroupFromRecord);
-    const pastGroups = joinedGroups.filter(isActivityCompleted);
+    const actualPastGroups = joinedGroups.filter(isActivityCompleted);
+    const pastGroups = [...actualPastGroups, ...demoPastHistoryGroups()];
     const upcomingGroups = joinedGroups.filter((group) => !isActivityCompleted(group));
-    const completed = pastGroups.length;
-    const revisitCount = pastGroups.filter((group) => checkins.some((item) => String(item.groupId) === String(group.id) && item.userId === state.user?.id && item.revisit === 'yes')).length;
+    const completed = actualPastGroups.length;
+    const revisitCount = actualPastGroups.filter((group) => checkins.some((item) => String(item.groupId) === String(group.id) && item.userId === state.user?.id && item.revisit === 'yes')).length;
     if (elements.historyCount) elements.historyCount.textContent = `${upcomingGroups.length + createdGroups.length + pastGroups.length}개 기록`;
     if (elements.historyCompletedCount) elements.historyCompletedCount.textContent = String(completed);
     if (elements.historyRevisitCount) elements.historyRevisitCount.textContent = String(revisitCount);
@@ -1687,6 +1765,13 @@ function renderCategoryOptions() {
     }
 }
 
+function placeLocationSettingsNearCategories() {
+    const categoryGroup = elements.categoryFilters?.closest('.filter-group');
+    if (!categoryGroup || !elements.locationQuickSetting) return;
+    categoryGroup.append(elements.locationQuickSetting);
+    elements.locationQuickSetting.classList.add('category-location-setting');
+}
+
 function setupParticipantLimitInput() {
     const select = $('input-limit');
     if (!select) return;
@@ -1716,6 +1801,36 @@ function setupParticipantLimitInput() {
 function removeBeginnerGuidance() {
     document.getElementById('input-beginner-friendly')?.closest('label')?.remove();
     document.querySelector('.activity-context-help')?.remove();
+}
+
+function setupDurationOptions() {
+    const select = $('input-duration');
+    if (!select) return;
+    select.replaceChildren(
+        createText('option', '1시간'),
+        createText('option', '2시간'),
+        createText('option', '3시간 이상')
+    );
+    select.options[0].value = '60';
+    select.options[1].value = '120';
+    select.options[2].value = '180';
+    select.options[0].selected = true;
+}
+
+function setupAtmosphereOptions() {
+    const select = $('input-conversation-level');
+    const label = document.querySelector('label[for="input-conversation-level"]');
+    if (!select) return;
+    if (label) label.textContent = '분위기';
+    select.replaceChildren(
+        createText('option', '차분함'),
+        createText('option', '보통'),
+        createText('option', '활발함')
+    );
+    select.options[0].value = 'quiet';
+    select.options[1].value = 'light_conversation';
+    select.options[2].value = 'active';
+    select.options[1].selected = true;
 }
 
 function renderNotifications() {
@@ -1853,25 +1968,30 @@ function queueGenderBalanceNotification(group) {
     setStatus('참여자 구성에 관한 확인 알림이 도착했습니다. 성비 숫자는 공개하지 않습니다.', 'info');
 }
 
-function localRecommendationMatches({ interest, comfort, timeWindow }) {
+function localRecommendationMatches({ interest, comfort, timeWindow, historyContext = '' }) {
     const startedAt = Date.now();
-    const interestTerms = String(interest || '').toLowerCase().split(/[\s,、，/]+/).map((term) => normalizeSafetyText(term)).filter(Boolean);
+    const preferenceText = `${interest || ''} ${historyContext}`;
+    const interestTerms = preferenceText.toLowerCase().split(/[\s,、，/·:\n]+/).map((term) => normalizeSafetyText(term)).filter((term) => term.length >= 2);
+    const relatedFamilies = new Set(ACTIVITY_FAMILIES.filter((family) => family.match.test(preferenceText)).map((family) => family.id));
     const now = Date.now();
     const matches = state.groups
-        .filter((group) => group.status === 'recruiting')
+        .filter((group) => group.status === 'recruiting' && isAvailableForDiscovery(group))
         .map((group) => {
             ensureGroupMetadata(group);
             const searchable = normalizeSafetyText(`${group.title} ${group.purpose} ${group.description}`);
-            const interestHit = interestTerms.length === 0 ? 0.25 : interestTerms.some((term) => searchable.includes(term)) ? 0.55 : 0;
+            const directHit = interestTerms.some((term) => searchable.includes(term));
+            const familyHit = relatedFamilies.has(group.categoryFamily);
+            const interestHit = directHit ? 0.55 : familyHit ? 0.2 : 0.08;
             const comfortText = comfort === 'quiet' && group.conversationLevel === 'quiet' ? 0.25 : comfort === 'light_conversation' && group.conversationLevel === 'light_conversation' ? 0.25 : comfort === 'active' && group.conversationLevel === 'active' ? 0.25 : comfort === 'beginner' && group.beginnerFriendly ? 0.25 : comfort === 'any' ? 0.1 : 0;
             const daysAway = (new Date(group.scheduledAt).getTime() - now) / (24 * 60 * 60 * 1000);
             const timeHit = timeWindow === 'today' && daysAway <= 1.2 ? 0.15 : timeWindow === 'this_week' && daysAway <= 7 ? 0.15 : timeWindow === 'any' ? 0.1 : 0;
-            const fit = Math.min(0.99, interestHit + comfortText + timeHit + 0.05);
-            const reason = interestHit >= 0.5 ? `${interest} 관심과 목적이 맞고, ` : '모임 목적이 부담 없이 참여하기 좋고, ';
+            const fit = Math.min(0.99, interestHit + comfortText + timeHit + 0.18);
+            const reason = directHit
+                ? interest ? `${interest} 관심과 목적이 맞고, ` : '이전 참여 이력의 관심사와 목적이 맞고, '
+                : familyHit ? '관심사와 연결된 활동 유형이고, ' : '관심사와 완전히 같지 않아도 가볍게 이어질 수 있고, ';
             const comfortReason = comfort === 'quiet' ? '대화 부담이 낮은 방식이에요.' : comfort === 'active' ? '함께 이야기하고 움직이는 활동이에요.' : comfort === 'beginner' ? '처음 참여하는 분도 괜찮은 활동이에요.' : '내 속도에 맞춰 참여하기 좋아요.';
             return { activityId: group.id, fit, reason: `${reason}${comfortReason}` };
         })
-        .filter((item) => item.fit >= 0.35)
         .sort((a, b) => b.fit - a.fit)
         .slice(0, 3);
     return matches;
@@ -1897,7 +2017,8 @@ async function getRecommendations(preferences) {
     const endpoint = automationEndpoint('recommend');
     if (endpoint) {
         try {
-            const result = await requestAutomation('recommend', { preferences, activities: state.groups.filter((group) => group.status === 'recruiting').map((group) => ({ id: group.id, title: group.title, purpose: group.purpose, description: group.description, location: group.location, scheduledAt: group.scheduledAt, participants: group.participants, maxParticipants: group.maxParticipants, category: group.category, conversationLevel: group.conversationLevel, beginnerFriendly: group.beginnerFriendly, durationMinutes: group.durationMinutes, status: group.status })) }, endpoint);
+            const recommendationActivities = state.groups.filter((group) => group.status === 'recruiting' && isAvailableForDiscovery(group));
+            const result = await requestAutomation('recommend', { preferences, activities: recommendationActivities.map((group) => ({ id: group.id, title: group.title, purpose: group.purpose, description: group.description, location: group.location, scheduledAt: group.scheduledAt, participants: group.participants, maxParticipants: group.maxParticipants, category: group.category, conversationLevel: group.conversationLevel, beginnerFriendly: group.beginnerFriendly, durationMinutes: group.durationMinutes, status: group.status })) }, endpoint);
             if (Array.isArray(result?.recommendations)) matches = result.recommendations.map((item) => ({ activityId: item.activityId, fit: Number(item.fit) || 0, reason: String(item.reason || ''), source: result.retrieval?.method || '' })).filter((item) => item.activityId && item.reason);
         } catch { matches = null; }
     }
@@ -1914,7 +2035,7 @@ function renderRecommendations(matches, preferences) {
         elements.recommendationStatus.dataset.tone = 'warning';
         return;
     }
-    elements.recommendationStatus.textContent = matches.some((match) => ['embedding-cosine', 'semantic-vector-cosine'].includes(match.source)) ? '활동 설명을 의미 벡터로 검색한 뒤, 조건에 맞는 연결을 추천했어요.' : '현재 모집 중인 활동 정보와 입력한 조건을 비교해 추천했어요.';
+    elements.recommendationStatus.textContent = matches.some((match) => ['embedding-cosine', 'semantic-vector-cosine'].includes(match.source)) ? `이전 참여 이력 ${preferences.historyCount || 0}건을 쿼리에 반영해 활동 데이터베이스를 의미 검색했어요.` : `이전 참여 이력 ${preferences.historyCount || 0}건과 현재 모집 중인 활동을 비교해 추천했어요.`;
     elements.recommendationStatus.dataset.tone = 'success';
     matches.forEach((match) => {
         const group = state.groups.find((item) => item.id === match.activityId);
@@ -1941,7 +2062,7 @@ async function handleRecommendation(event) {
     event.preventDefault();
     const guard = guardRecommendationInput($('input-interest').value);
     if (!guard.ok) { elements.recommendationStatus.textContent = guard.message; elements.recommendationStatus.dataset.tone = 'warning'; return; }
-    const preferences = { interest: guard.value, comfort: $('input-comfort').value, timeWindow: $('input-time-window').value };
+    const preferences = { interest: guard.value, comfort: $('input-comfort').value, timeWindow: $('input-time-window').value, ...recommendationHistoryProfile() };
     elements.recommendationStatus.textContent = automationEndpoint('recommend') ? '추천 RAG가 활동 근거와 조건을 확인하고 있어요...' : '현재 모집 중인 활동 정보와 참여 조건을 비교하고 있어요...';
     const matches = await getRecommendations(preferences);
     renderRecommendations(matches, preferences);
@@ -1951,14 +2072,17 @@ async function showAiRecommendedActivities() {
     const interest = elements.search.value.trim() || $('input-interest')?.value.trim() || '';
     const guard = guardRecommendationInput(interest);
     if (!guard.ok) return setStatus(guard.message, 'warning');
-    const preferences = { interest: guard.value, comfort: $('input-comfort')?.value || 'any', timeWindow: $('input-time-window')?.value || 'any' };
-    setStatus('AI가 현재 모집 중인 활동을 근거로 추천 모임을 찾고 있어요…', 'info');
+    const preferences = { interest: guard.value, comfort: $('input-comfort')?.value || 'any', timeWindow: $('input-time-window')?.value || 'any', ...recommendationHistoryProfile() };
+    state.filters.query = '';
+    state.filters.category = 'all';
+    state.filters.ageGroup = 'all';
+    setStatus(`AI가 이전 참여 이력 ${preferences.historyCount}건을 쿼리로 만들고 현재 모집 중인 활동 데이터베이스를 검색하고 있어요…`, 'info');
     const matches = await getRecommendations(preferences);
     state.recommendedGroupIds = matches.map((match) => String(match.activityId));
     state.recommendationReasons = Object.fromEntries(matches.map((match) => [String(match.activityId), match.reason]));
     renderGroups();
     if (!state.recommendedGroupIds.length) return setStatus('지금 조건에 맞는 AI 추천 모임이 없어요. 관심사나 연결 속도를 바꿔 다시 찾아보세요.', 'info');
-    setStatus(`AI 추천 모임 ${state.recommendedGroupIds.length}개를 먼저 보여드려요. 그다음은 날짜와 거리 순서예요.`, 'success');
+    setStatus(`이전 참여 이력 ${preferences.historyCount}건을 반영한 AI 추천 모임 ${state.recommendedGroupIds.length}개를 먼저 보여드려요. 그다음은 날짜와 거리 순서예요.`, 'success');
     elements.list.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
@@ -2845,7 +2969,7 @@ function init() {
         localStorage.setItem(USER_KEY, JSON.stringify(state.user));
     }
     state.filters.ageGroup = 'all';
-    persistence.load(); loadNotifications(); renderCategoryOptions(); setupParticipantLimitInput(); removeBeginnerGuidance(); migrateCurrentUserAccount(state.user); syncActivityHistory(); updateNav(); renderGroups(); cancelUnderfilledGroups(); setView(viewFromLocation(), false, false);
+    persistence.load(); loadNotifications(); renderCategoryOptions(); setupParticipantLimitInput(); setupDurationOptions(); setupAtmosphereOptions(); removeBeginnerGuidance(); placeLocationSettingsNearCategories(); migrateCurrentUserAccount(state.user); syncActivityHistory(); updateNav(); renderGroups(); cancelUnderfilledGroups(); setView(viewFromLocation(), false, false);
     elements.profileForm.addEventListener('submit', submitProfile);
     $('signup-id').addEventListener('input', () => { signupState.idAvailable = false; signupState.idCheckedId = ''; $('signup-id').dataset.checkedId = ''; $('signup-id').dataset.idAvailable = 'false'; $('signup-id-status').textContent = '아이디가 변경되었습니다. 다시 중복 확인해 주세요.'; $('signup-id-status').dataset.tone = 'info'; });
     $('signup-password').addEventListener('input', validateSignupPassword);

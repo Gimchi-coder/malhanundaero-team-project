@@ -42,7 +42,6 @@
                 <p class="hero-description">혼자 지내는 시간이 길어졌거나, 새로운 만남이 조심스러운 분들을 위한 서비스입니다. 활동의 종류는 넓게 열어두고, 대화 부담과 참여 속도를 확인하며 편안한 연결을 시작할 수 있도록 돕습니다.</p>
                 <div class="hero-actions">
                     <button id="btn-enter-activities" class="btn-primary" type="button" data-view-target="activities">활동 둘러보기</button>
-                    <button id="btn-recommendation-hero" class="btn-ghost" type="button" data-view-target="recommendation">내게 맞는 활동 찾기 <span>→</span></button>
                 </div>
                 <p class="hero-login-note">로그인 없이 활동을 둘러보고, 참여할 때 로그인할 수 있어요.</p>
             </div>
@@ -137,10 +136,14 @@
                 <div id="history-created-list" class="history-list" aria-live="polite"></div>
             </section>
             <section id="history-panel-past" class="history-panel hidden" role="tabpanel" aria-labelledby="history-tab-past">
-                <div class="history-panel-heading"><h3 id="history-panel-past-heading">이전 참여 이력</h3><p>일정이 끝난 모임과 그때의 연결 기록을 한 곳에서 다시 볼 수 있어요.</p></div>
+                <div class="history-panel-heading"><h3 id="history-panel-past-heading">이전 참여 이력</h3><p>일정이 끝난 모임과 그때의 연결 기록을 한 곳에서 다시 볼 수 있어요. 아래 RAG 시연 데이터 12건은 AI 추천 모임 보기에서 검색 질의로 변환되어 현재 모집 중인 활동 데이터베이스와 비교됩니다.</p></div>
                 <div id="history-past-list" class="history-list" aria-live="polite"></div>
             </section>
             <div class="history-completion-note"><strong>참여 완료 후 평가할 수 있어요</strong><span>활동 일시가 지난 뒤 참여 완료로 기록하고, 편안함·재참여 의향과 행동 기반 평가를 남겨 보세요.</span></div>
+            <section class="history-feedback-example" aria-labelledby="history-feedback-example-title">
+                <div><p class="eyebrow">AFTER ACTIVITY RECORD</p><h3 id="history-feedback-example-title">활동 후 기록 예시</h3><p>모임이 끝나면 아래처럼 내 느낌과 다음 참여 의향을 남길 수 있어요. 참여 온도는 별도의 행동 피드백으로만 바뀝니다.</p></div>
+                <div class="history-feedback-example-card"><strong>동네 사진 산책</strong><span>오늘의 느낌 · 편안하게 참여했어요</span><span>다시 참여할 의향 · 비슷한 활동을 다시 찾아볼래요</span><span>행동 평점 · 시간 약속 ★★★★☆ · 배려와 매너 ★★★★★</span></div>
+            </section>
             <div class="history-policy"><strong>두 가지 평가는 서로 달라요</strong><span><b>참여 온도</b>는 다른 참여자가 남긴 행동 기반 신뢰 지표</span><span><b>활동 후 기록</b>은 내 경험과 다음 참여 의향을 위한 비공개 기록</span></div>
         </section>
 

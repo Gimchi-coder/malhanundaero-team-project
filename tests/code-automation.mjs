@@ -28,10 +28,15 @@ assert.equal(automation.deterministicSafetyGate(injectionActivity).state, 'manua
 assert.equal(automation.finalizeSafetyResult({ decision: 'approved', confidence: 'medium' }, 'medium-safe').decision, 'approved');
 assert.equal(automation.finalizeSafetyResult({ decision: 'approved', confidence: 'low' }, 'low-unclear').decision, 'manual_review');
 
-const envelope = automation.validateEnvelope({ operation: 'recommend', preferences: { interest: '독서', comfort: 'quiet', timeWindow: 'this_week' }, activities: [safeActivity] });
+const historyContext = '문화생활: 조용한 전시 관람 · 편안하게 참여함 · 다시 참여하고 싶음';
+const envelope = automation.validateEnvelope({ operation: 'recommend', preferences: { interest: '독서', comfort: 'quiet', timeWindow: 'this_week', historyContext, historyCount: 12 }, activities: [safeActivity] });
 assert.equal(envelope.operation, 'recommend');
+assert.equal(envelope.preferences.historyContext, historyContext);
+assert.equal(envelope.preferences.historyCount, 12);
+assert.match(automation.recommendationQuery(envelope.preferences), new RegExp(`이전 참여 이력: ${historyContext}`));
 assert.throws(() => automation.validateEnvelope({ operation: 'safety_review', activity: { title: '제목' } }), /missing activity field/);
 assert.throws(() => automation.validateEnvelope({ operation: 'recommend', preferences: { interest: '010-1234-5678' }, activities: [safeActivity] }), /private contact information/);
+assert.throws(() => automation.validateEnvelope({ operation: 'recommend', preferences: { historyContext: '문의 010-1234-5678' }, activities: [safeActivity] }), /private contact information/);
 
 const docs = automation.buildRecommendationDocuments([
     { ...safeActivity, status: 'recruiting', participants: 1 },
@@ -52,4 +57,16 @@ const ranked = automation.rankRecommendationDocuments(
 assert.equal(ranked[0].id, 'book');
 assert.ok(ranked[0].fit > ranked[1].fit);
 
-console.log(JSON.stringify({ passed: true, suite: 'code-automation', checks: 11 }));
+const supplemented = automation.sanitizeRecommendations(
+    { recommendations: [{ activityId: 'book', reason: '첫 번째 후보', fit: 0.9 }] },
+    new Set(['book', 'run', 'culture']),
+    'supplement-test',
+    [
+        { activityId: 'book', reason: '검색 후보', fit: 0.8 },
+        { activityId: 'run', reason: '내용이 달라도 연결될 수 있는 후보', fit: 0.7 },
+        { activityId: 'culture', reason: '현재 모집 중인 후보', fit: 0.6 }
+    ]
+);
+assert.deepEqual(supplemented.recommendations.map((item) => item.activityId), ['book', 'run', 'culture']);
+
+console.log(JSON.stringify({ passed: true, suite: 'code-automation', checks: 16 }));

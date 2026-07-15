@@ -131,9 +131,13 @@ function validatePreferences(preferences) {
     if (!['quiet', 'light_conversation', 'active', 'beginner', 'any'].includes(comfort)) throw validationError('unsupported comfort', 'preferences.comfort');
     if (!['today', 'this_week', 'any'].includes(timeWindow)) throw validationError('unsupported timeWindow', 'preferences.timeWindow');
     const interest = String(preferences.interest || '').trim().slice(0, 160);
+    const historyContext = String(preferences.historyContext || '').trim().slice(0, 1200);
+    const historyCount = Math.max(0, Math.min(50, Number(preferences.historyCount) || 0));
     if (maskSensitive(interest) !== interest) throw validationError('private contact information is not allowed', 'preferences.interest');
+    if (maskSensitive(historyContext) !== historyContext) throw validationError('private contact information is not allowed', 'preferences.historyContext');
     if (containsInjection(interest)) throw validationError('system instructions are not allowed', 'preferences.interest');
-    return { interest, comfort, timeWindow };
+    if (containsInjection(historyContext)) throw validationError('system instructions are not allowed', 'preferences.historyContext');
+    return { interest, comfort, timeWindow, historyContext, historyCount };
 }
 
 function validateEnvelope(body) {
@@ -154,7 +158,7 @@ function activityText(activity) {
 }
 
 function recommendationQuery(preferences) {
-    return [preferences.interest, preferences.comfort, preferences.timeWindow, '부담이 적고 공개된 장소에서 함께하는 건강한 동네 활동'].filter(Boolean).join(' | ');
+    return [preferences.interest, preferences.historyContext ? `이전 참여 이력: ${preferences.historyContext}` : '', preferences.comfort, preferences.timeWindow, '부담이 적고 공개된 장소에서 함께하는 건강한 동네 활동'].filter(Boolean).join(' | ');
 }
 
 function buildRecommendationDocuments(activities) {
@@ -286,10 +290,13 @@ function sanitizeRecommendations(value, allowedIds, requestId, fallback = []) {
         reason: String(item?.reason || '').slice(0, 500),
         fit: Math.max(0, Math.min(1, Number(item?.fit) || 0))
     })).filter((item) => allowedIds.has(item.activityId) && item.reason).slice(0, 3);
+    const fallbackSafe = fallback.filter((item) => allowedIds.has(String(item.activityId)) && item.reason);
+    const seen = new Set(safe.map((item) => item.activityId));
+    const merged = [...safe, ...fallbackSafe.filter((item) => !seen.has(String(item.activityId)))].slice(0, 3);
     return {
         requestId,
-        recommendations: safe.length ? safe : fallback,
-        message: safe.length || fallback.length ? '' : '조건에 맞는 활동이 없습니다. 관심사나 편안한 만남 조건을 조금 넓혀 다시 시도해 주세요.',
+        recommendations: merged,
+        message: merged.length ? '' : '조건에 맞는 활동이 없습니다. 관심사나 편안한 만남 조건을 조금 넓혀 다시 시도해 주세요.',
         policyVersion: POLICY_VERSIONS.recommendation
     };
 }
