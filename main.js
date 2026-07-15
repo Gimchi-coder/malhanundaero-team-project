@@ -1376,7 +1376,7 @@ function renderCategoryFilters() {
     const options = [{ id: 'all', label: '전체 활동' }, ...ACTIVITY_FAMILIES.map((family) => ({ id: family.id, label: family.label }))];
     options.forEach(({ id, label }) => {
         const count = id === 'all' ? recruiting.length : recruiting.filter((group) => group.categoryFamily === id).length;
-        const button = createText('button', `${label} ${count}`, `category-filter${state.filters.category === id ? ' active' : ''}`);
+        const button = createText('button', `${label} ${count}`, `category-filter category-filter-${id}${state.filters.category === id ? ' active' : ''}`);
         button.type = 'button';
         button.dataset.categoryFilter = id;
         button.addEventListener('click', () => { state.filters.category = id; renderGroups(); setStatus(`${label} 활동을 보고 있어요.`, 'success'); });
@@ -1418,7 +1418,7 @@ function renderGroups() {
         card.append(
             ...(isRecommended ? [createText('span', '✦ AI 추천 모임', 'ai-recommendation-badge')] : []),
             ageBadge,
-            createText('span', `${activityFamilyLabel(group.categoryFamily)} · ${group.category}`, 'category-badge'),
+            createText('span', `${activityFamilyLabel(group.categoryFamily)} · ${group.category}`, `category-badge category-badge-${group.categoryFamily}`),
             temperatureBadge,
             contextBadges,
             createText('h3', group.title, 'card-title'),
@@ -1606,7 +1606,7 @@ function renderHistory() {
         const header = document.createElement('div');
         header.className = 'history-card-header';
         header.append(createText('span', completedActivity ? '활동 완료' : '참여 예정', `history-status ${completedActivity ? 'history-status-complete' : 'history-status-upcoming'}`), createText('span', formatDate(group.scheduledAt), 'card-meta'));
-        card.append(header, createText('span', `${activityFamilyLabel(group.categoryFamily)} · ${group.category}`, 'category-badge'), createText('h3', group.title), createText('p', `${group.purpose} · ${conversationLevelLabel(group.conversationLevel)}`, 'card-purpose'), createText('span', `📍 ${group.location} · ${formatDuration(group.durationMinutes)}`, 'card-meta'));
+        card.append(header, createText('span', `${activityFamilyLabel(group.categoryFamily)} · ${group.category}`, `category-badge category-badge-${group.categoryFamily}`), createText('h3', group.title), createText('p', `${group.purpose} · ${conversationLevelLabel(group.conversationLevel)}`, 'card-purpose'), createText('span', `📍 ${group.location} · ${formatDuration(group.durationMinutes)}`, 'card-meta'));
         if (checkin) card.append(createText('p', `내 기록: ${checkin.feelingLabel} · ${checkin.revisitLabel}`, 'history-checkin-note'));
         const actions = document.createElement('div');
         actions.className = 'card-actions';
@@ -1647,7 +1647,7 @@ function renderCategoryOptions() {
             card.type = 'button';
             card.className = 'activity-example-card';
             card.append(
-                createText('span', activityFamilyLabel(example.family), 'category-badge'),
+                createText('span', activityFamilyLabel(example.family), `category-badge category-badge-${example.family}`),
                 createText('strong', example.title),
                 createText('p', example.description)
             );
