@@ -80,7 +80,6 @@ const elements = {
     nicknameSetupModal: $('modal-nickname-setup'),
     nicknameSetupForm: $('form-nickname-setup'),
     nicknameSetupStatus: $('nickname-submit-status'),
-    create: $('btn-create'),
     profile: $('user-profile'),
     profileButton: $('btn-profile'),
     profileModal: $('modal-profile'),
@@ -114,7 +113,6 @@ elements.recommendationStatus = $('recommendation-status');
 elements.recommendationList = $('recommendation-list');
 elements.search = $('input-group-search');
 elements.applySearch = $('btn-apply-search');
-elements.createMain = $('btn-create-main');
 elements.recommendationHero = $('btn-recommendation-hero');
 elements.locationSettingsButton = $('btn-location-settings');
 elements.locationSettingsPopover = $('location-settings-popover');
@@ -126,8 +124,15 @@ elements.locationManualLocation = $('input-manual-location');
 elements.ageFilters = $('age-filter-buttons');
 elements.categoryFilters = $('category-filter-buttons');
 elements.groupCount = $('group-count');
-elements.historyList = $('history-list');
-elements.historyEmpty = $('history-empty');
+elements.historyJoinedList = $('history-joined-list');
+elements.historyCreatedList = $('history-created-list');
+elements.historyPastList = $('history-past-list');
+elements.historyPanels = {
+    joined: $('history-panel-joined'),
+    created: $('history-panel-created'),
+    past: $('history-panel-past')
+};
+elements.historyTabs = [...document.querySelectorAll('[data-history-tab]')];
 elements.historyCount = $('history-count');
 elements.historyCompletedCount = $('history-completed-count');
 elements.historyRevisitCount = $('history-revisit-count');
@@ -929,32 +934,18 @@ function seedGroups() {
 }
 
 const ACTIVITY_TYPES = [
-    '공부·자기계발', '독서 모임', '영어 회화 모임', '일본어 스터디', '코딩 스터디', 'AI 활용 스터디',
-    '자격증 준비 모임', '토론 모임', '논문 읽기 모임', '역사 탐방 및 세미나', '글쓰기 모임',
-    '보드게임 모임', '방탈출 모임', '영화 감상 모임', '드라마 정주행 모임', '사진 출사 모임',
-    '그림 그리기 모임', '뜨개질 모임', '캘리그래피 모임', '악기 합주 모임', '합창 모임',
-    '노래방 모임', 'K-POP 커버댄스 모임', '러닝 크루', '등산 모임', '배드민턴 모임', '풋살 모임',
-    '농구 모임', '볼링 모임', '탁구 모임', '클라이밍 모임', '자전거 라이딩 모임', '요가 모임',
-    '맛집 탐방 모임', '카페 투어', '브런치 모임', '피크닉 모임', '여행 모임', '드라이브 모임',
-    '캠핑 모임', '와인·티 모임', '리그 오브 레전드 내전', '발로란트 파티', '마인크래프트 서버',
-    '스팀 협동게임 모임', '닌텐도 스위치 모임', '모바일 게임 길드 모임', '추리 게임 모임',
-    '연극 관람', '뮤지컬 관람', '전시회 관람', '박물관 탐방', '역사 유적 답사', '축제 함께 가기',
-    '콘서트 관람', '버스킹 관람', '플로깅 모임', '유기동물 봉사', '환경정화 활동', '교육봉사',
-    '헌혈 캠페인 참여', '지역 축제 봉사', '창업 모임', '사이드 프로젝트', '앱 개발 프로젝트',
-    '게임 개발 팀', '공모전 팀', '해커톤 팀', '영상 제작 팀', '팟캐스트 제작', '유튜브 콘텐츠 제작',
-    '책 출판 프로젝트', '베이킹 클래스', '요리 모임', '바리스타 체험', '도예 체험', '향수 만들기',
-    '비누 만들기', '꽃꽂이 클래스', '원데이 클래스 투어', '엄마들 정보 공유 모임'
+    '공부·자기계발', '취미', '운동', '친목', '게임', '문화생활', '봉사·사회활동', '프로젝트', '기타'
 ];
 
 const ACTIVITY_FAMILIES = [
     { id: 'study', label: '공부·자기계발', match: /스터디|공부|회화|코딩|AI 활용|자격증|토론|논문|역사|글쓰기|엄마들 정보/ },
-    { id: 'hobby', label: '취미', match: /보드게임|방탈출|영화|드라마|사진|그림|뜨개질|캘리그래피|악기|합창|노래방|K-POP/ },
+    { id: 'hobby', label: '취미', match: /취미|보드게임|방탈출|영화|드라마|사진|그림|뜨개질|캘리그래피|악기|합창|노래방|K-POP/ },
     { id: 'sports', label: '운동', match: /운동|러닝|등산|배드민턴|풋살|농구|볼링|탁구|클라이밍|자전거|요가|산책/ },
     { id: 'social', label: '친목', match: /맛집|카페|브런치|피크닉|여행|드라이브|캠핑|와인|친목/ },
-    { id: 'game', label: '게임', match: /리그 오브 레전드|발로란트|마인크래프트|스팀|닌텐도|모바일 게임|추리 게임/ },
-    { id: 'culture', label: '문화생활', match: /연극|뮤지컬|전시|박물관|역사 유적|축제|콘서트|버스킹/ },
-    { id: 'community', label: '봉사·사회활동', match: /플로깅|유기동물|환경정화|교육봉사|헌혈|지역 축제 봉사/ },
-    { id: 'project', label: '프로젝트', match: /창업|사이드 프로젝트|앱 개발|게임 개발|공모전|해커톤|영상 제작|팟캐스트|유튜브|책 출판/ },
+    { id: 'game', label: '게임', match: /게임|리그 오브 레전드|발로란트|마인크래프트|스팀|닌텐도|모바일 게임|추리 게임/ },
+    { id: 'culture', label: '문화생활', match: /문화생활|연극|뮤지컬|전시|박물관|역사 유적|축제|콘서트|버스킹/ },
+    { id: 'community', label: '봉사·사회활동', match: /봉사|플로깅|유기동물|환경정화|교육봉사|헌혈|지역 축제 봉사/ },
+    { id: 'project', label: '프로젝트', match: /프로젝트|창업|사이드 프로젝트|앱 개발|게임 개발|공모전|해커톤|영상 제작|팟캐스트|유튜브|책 출판/ },
     { id: 'other', label: '기타', match: /베이킹|요리|바리스타|도예|향수|비누|꽃꽂이|원데이|기타/ }
 ];
 
@@ -1407,7 +1398,6 @@ function renderGroups() {
         contextBadges.className = 'activity-context-badges';
         contextBadges.append(
             createText('span', `💬 ${conversationLevelLabel(group.conversationLevel)}`, 'context-badge'),
-            createText('span', group.beginnerFriendly ? '🌱 초보 참여 가능' : '경험자 중심', 'context-badge'),
             createText('span', `⏱ ${formatDuration(group.durationMinutes)}`, 'context-badge')
         );
         const distance = activityDistanceKm(group);
@@ -1435,8 +1425,9 @@ function renderGroups() {
         join.addEventListener('click', () => toggleParticipation(group.id));
         const room = document.createElement('button');
         room.type = 'button'; room.className = 'btn-text'; room.textContent = '공지방';
-        room.disabled = !state.joinedGroupIds.has(group.id);
-        room.title = room.disabled ? '참여 후 열 수 있어요.' : '활동 공지·채팅방 열기';
+        const canOpenRoom = state.joinedGroupIds.has(group.id);
+        room.setAttribute('aria-disabled', String(!canOpenRoom));
+        room.title = canOpenRoom ? '활동 공지·채팅방 열기' : '참여 신청 후 열 수 있어요.';
         room.addEventListener('click', () => openActivityRoom(group.id));
         const report = document.createElement('button');
         report.type = 'button'; report.className = 'btn-text'; report.textContent = '신고';
@@ -1511,7 +1502,10 @@ function recordParticipationEvent(group, action) {
 }
 
 function openActivityRoom(groupId) {
-    if (!state.user) return setStatus('로그인 후 활동 공지방을 확인할 수 있습니다.', 'warning');
+    if (!state.user) {
+        openLogin();
+        return setStatus('로그인하면 참여한 활동의 공지방을 확인할 수 있습니다.', 'warning');
+    }
     const group = state.groups.find((item) => item.id === groupId);
     if (!group || !state.joinedGroupIds.has(groupId)) return setStatus('참여한 활동의 공지방만 확인할 수 있습니다.', 'warning');
     closeNotifications();
@@ -1571,67 +1565,101 @@ function markActivityCompleted(groupId) {
     setStatus(`'${group.title}' 활동을 참여 완료로 기록했습니다. 이제 활동 후 평가를 남겨 보세요.`, 'success');
 }
 
-function renderHistory() {
-    if (!elements.historyList) return;
-    elements.historyList.replaceChildren();
-    const checkins = getConnectionCheckins();
-    const joined = state.user ? state.groups.filter((group) => state.joinedGroupIds.has(group.id)) : [];
-    const completed = joined.filter(isActivityCompleted);
-    const revisitCount = completed.filter((group) => checkins.some((item) => item.groupId === group.id && item.userId === state.user?.id && item.revisit === 'yes')).length;
-    if (elements.historyCount) elements.historyCount.textContent = `${joined.length}개 활동`;
-    if (elements.historyCompletedCount) elements.historyCompletedCount.textContent = String(completed.length);
-    if (elements.historyRevisitCount) elements.historyRevisitCount.textContent = String(revisitCount);
-    if (elements.historyTrustScore) elements.historyTrustScore.textContent = `${normalizedTrustScore(state.user?.trustScore)}°C`;
-    if (elements.historyEmpty) {
-        elements.historyEmpty.classList.toggle('hidden', joined.length > 0);
-        const emptyTitle = elements.historyEmpty.querySelector('strong');
-        const emptyDescription = elements.historyEmpty.querySelector('p');
-        if (!state.user) {
-            if (emptyTitle) emptyTitle.textContent = '로그인 후 나의 활동 기록을 확인할 수 있어요.';
-            if (emptyDescription) emptyDescription.textContent = '활동은 로그인 없이 둘러볼 수 있고, 참여 신청과 활동 후 평가는 로그인 후 이용할 수 있습니다.';
-        } else {
-            if (emptyTitle) emptyTitle.textContent = '활동에 참여하면 이곳에 기록이 남아요.';
-            if (emptyDescription) emptyDescription.textContent = '활동이 끝난 뒤 편안함과 다시 참여할 의향을 남기고, 원한다면 다른 참여자의 시간 약속·배려·규칙 준수도 평가할 수 있어요.';
-        }
+function historyGroupFromRecord(record) {
+    const group = state.groups.find((item) => String(item.id) === String(record.activityId));
+    if (group) return group;
+    return ensureGroupMetadata({
+        id: String(record.activityId), title: record.title, purpose: record.purpose, description: record.purpose,
+        location: record.location, scheduledAt: record.scheduledAt, status: record.status || 'completed',
+        participants: record.participants, maxParticipants: record.maxParticipants, category: record.category,
+        ageGroup: 'all', hostTrustScore: TRUST_BASELINE, participantIds: []
+    });
+}
+
+function renderHistoryGroupList(container, groups, type, emptyMessage, checkins) {
+    if (!container) return;
+    container.replaceChildren();
+    if (!groups.length) {
+        container.append(createText('p', emptyMessage, 'empty-history'));
+        return;
     }
-    joined.sort((a, b) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime()).forEach((group) => {
+    const sorted = [...groups].sort((a, b) => {
+        const left = new Date(a.scheduledAt).getTime();
+        const right = new Date(b.scheduledAt).getTime();
+        return type === 'past' ? right - left : left - right;
+    });
+    sorted.forEach((group) => {
         ensureGroupMetadata(group);
         const completedActivity = isActivityCompleted(group);
-        const checkin = checkins.find((item) => item.groupId === group.id && item.userId === state.user.id);
+        const checkin = checkins.find((item) => String(item.groupId) === String(group.id) && item.userId === state.user?.id);
         const card = document.createElement('article');
         card.className = 'history-card';
         const header = document.createElement('div');
         header.className = 'history-card-header';
-        header.append(createText('span', completedActivity ? '활동 완료' : '참여 예정', `history-status ${completedActivity ? 'history-status-complete' : 'history-status-upcoming'}`), createText('span', formatDate(group.scheduledAt), 'card-meta'));
+        header.append(
+            createText('span', completedActivity ? '활동 완료' : type === 'created' ? '내가 만든 활동' : '참여 예정', `history-status ${completedActivity ? 'history-status-complete' : 'history-status-upcoming'}`),
+            createText('span', formatDate(group.scheduledAt), 'card-meta')
+        );
         card.append(header, createText('span', `${activityFamilyLabel(group.categoryFamily)} · ${group.category}`, 'category-badge'), createText('h3', group.title), createText('p', `${group.purpose} · ${conversationLevelLabel(group.conversationLevel)}`, 'card-purpose'), createText('span', `📍 ${group.location} · ${formatDuration(group.durationMinutes)}`, 'card-meta'));
         if (checkin) card.append(createText('p', `내 기록: ${checkin.feelingLabel} · ${checkin.revisitLabel}`, 'history-checkin-note'));
         const actions = document.createElement('div');
         actions.className = 'card-actions';
-        const room = document.createElement('button');
-        room.type = 'button'; room.className = 'btn-outline btn-small'; room.textContent = '공지방 열기';
-        room.addEventListener('click', () => openActivityRoom(group.id));
-        actions.append(room);
-        if (completedActivity) {
-            const evaluate = document.createElement('button');
-            evaluate.type = 'button'; evaluate.className = 'btn-primary btn-small'; evaluate.textContent = checkin ? '기록 다시 보기' : '활동 후 평가하기';
-            evaluate.addEventListener('click', () => openFeedback(group.id));
-            actions.append(evaluate);
-        } else {
+        if (state.joinedGroupIds.has(String(group.id)) || state.joinedGroupIds.has(group.id)) {
+            const room = document.createElement('button');
+            room.type = 'button'; room.className = 'btn-outline btn-small'; room.textContent = '공지방 열기';
+            room.addEventListener('click', () => openActivityRoom(group.id));
+            actions.append(room);
+        }
+        if (type === 'joined' && !completedActivity) {
+            const cancel = document.createElement('button');
+            cancel.type = 'button'; cancel.className = 'btn-danger-outline btn-small'; cancel.textContent = '참여 취소';
+            cancel.addEventListener('click', () => toggleParticipation(group.id));
+            actions.append(cancel);
             const complete = document.createElement('button');
             complete.type = 'button'; complete.className = 'btn-outline btn-small'; complete.textContent = '참여 완료 기록';
             complete.title = '활동이 끝난 뒤 눌러 주세요.';
             complete.addEventListener('click', () => markActivityCompleted(group.id));
-            const view = document.createElement('button');
-            view.type = 'button'; view.className = 'btn-outline btn-small'; view.textContent = '활동 상세 보기';
-            view.addEventListener('click', () => {
-                setView('activities');
-                window.setTimeout(() => document.getElementById(`activity-${group.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 0);
-            });
-            actions.append(complete, view);
+            actions.append(complete);
         }
-        card.append(actions);
-        elements.historyList.append(card);
+        if (type === 'past') {
+            const evaluate = document.createElement('button');
+            evaluate.type = 'button'; evaluate.className = 'btn-primary btn-small'; evaluate.textContent = checkin ? '기록 다시 보기' : '활동 후 평가하기';
+            evaluate.addEventListener('click', () => openFeedback(group.id));
+            actions.append(evaluate);
+        }
+        if (actions.childElementCount) card.append(actions);
+        container.append(card);
     });
+}
+
+function setHistoryTab(tab) {
+    const activeTab = ['joined', 'created', 'past'].includes(tab) ? tab : 'joined';
+    elements.historyTabs.forEach((button) => {
+        const isActive = button.dataset.historyTab === activeTab;
+        button.classList.toggle('active', isActive);
+        button.setAttribute('aria-selected', String(isActive));
+    });
+    Object.entries(elements.historyPanels).forEach(([key, panel]) => panel?.classList.toggle('hidden', key !== activeTab));
+}
+
+function renderHistory() {
+    if (!elements.historyJoinedList || !elements.historyCreatedList || !elements.historyPastList) return;
+    const checkins = getConnectionCheckins();
+    const history = state.user ? getActivityHistory() : emptyActivityHistory();
+    const joinedGroups = history.joined.map(historyGroupFromRecord);
+    const createdGroups = history.created.map(historyGroupFromRecord);
+    const pastGroups = joinedGroups.filter(isActivityCompleted);
+    const upcomingGroups = joinedGroups.filter((group) => !isActivityCompleted(group));
+    const completed = pastGroups.length;
+    const revisitCount = pastGroups.filter((group) => checkins.some((item) => String(item.groupId) === String(group.id) && item.userId === state.user?.id && item.revisit === 'yes')).length;
+    if (elements.historyCount) elements.historyCount.textContent = `${upcomingGroups.length + createdGroups.length + pastGroups.length}개 기록`;
+    if (elements.historyCompletedCount) elements.historyCompletedCount.textContent = String(completed);
+    if (elements.historyRevisitCount) elements.historyRevisitCount.textContent = String(revisitCount);
+    if (elements.historyTrustScore) elements.historyTrustScore.textContent = `${normalizedTrustScore(state.user?.trustScore)}°C`;
+    renderHistoryGroupList(elements.historyJoinedList, upcomingGroups, 'joined', state.user ? '아직 신청한 활동이 없어요.' : '로그인 후 신청한 활동이 표시돼요.', checkins);
+    renderHistoryGroupList(elements.historyCreatedList, createdGroups, 'created', state.user ? '아직 만든 활동이 없어요.' : '로그인 후 만든 활동이 표시돼요.', checkins);
+    renderHistoryGroupList(elements.historyPastList, pastGroups, 'past', state.user ? '종료된 참여 이력이 아직 없어요.' : '로그인 후 이전 참여 이력을 확인할 수 있어요.', checkins);
+    setHistoryTab('joined');
 }
 
 function renderCategoryOptions() {
@@ -1657,6 +1685,37 @@ function renderCategoryOptions() {
             elements.activityExamples.append(card);
         });
     }
+}
+
+function setupParticipantLimitInput() {
+    const select = $('input-limit');
+    if (!select) return;
+    if (![...select.options].some((option) => option.value === 'custom')) {
+        select.append(createText('option', '직접 입력'));
+        select.lastElementChild.value = 'custom';
+    }
+    let customInput = $('input-limit-custom');
+    if (!customInput) {
+        customInput = document.createElement('input');
+        customInput.id = 'input-limit-custom';
+        customInput.type = 'number';
+        customInput.min = String(MIN_PARTICIPANTS);
+        customInput.max = String(DEFAULT_MAX_PARTICIPANTS);
+        customInput.step = '1';
+        customInput.inputMode = 'numeric';
+        customInput.placeholder = '3~6명 직접 입력';
+        customInput.setAttribute('aria-label', '모집 인원 직접 입력');
+        customInput.className = 'hidden';
+        select.parentElement.append(customInput);
+    }
+    const sync = () => customInput.classList.toggle('hidden', select.value !== 'custom');
+    select.addEventListener('change', sync);
+    sync();
+}
+
+function removeBeginnerGuidance() {
+    document.getElementById('input-beginner-friendly')?.closest('label')?.remove();
+    document.querySelector('.activity-context-help')?.remove();
 }
 
 function renderNotifications() {
@@ -1907,7 +1966,6 @@ function updateNav() {
     const loggedIn = Boolean(state.user);
     elements.login.classList.toggle('hidden', loggedIn);
     elements.signup.classList.toggle('hidden', loggedIn);
-    elements.create.classList.toggle('hidden', !loggedIn);
     elements.profile.classList.toggle('hidden', !loggedIn);
     elements.notificationsButton.classList.toggle('hidden', !loggedIn);
     if (loggedIn) {
@@ -2422,7 +2480,7 @@ function validateActivity(activity) {
     if (!activity.title || !activity.purpose || !activity.description || !activity.location || !activity.scheduledAt || !activity.category || !activity.ageGroup) return '모든 필수 항목을 입력해 주세요.';
     const scheduledTime = new Date(activity.scheduledAt).getTime();
     if (!Number.isFinite(scheduledTime) || scheduledTime <= Date.now()) return '모임 시간은 현재보다 이후여야 합니다.';
-    if (activity.maxParticipants < MIN_PARTICIPANTS || activity.maxParticipants > DEFAULT_MAX_PARTICIPANTS) return '모집 인원은 3명에서 6명 사이여야 합니다.';
+    if (!Number.isInteger(activity.maxParticipants) || activity.maxParticipants < MIN_PARTICIPANTS || activity.maxParticipants > DEFAULT_MAX_PARTICIPANTS) return '모집 인원은 3명에서 6명 사이여야 합니다.';
     if (/자택|집|호텔|개인s*주소|우리집/i.test(activity.location)) return '공개된 상업·공공장소를 입력해 주세요.';
     return '';
 }
@@ -2432,14 +2490,16 @@ async function handleCreate(event) {
     if (!state.user) return setStatus('로그인 후 모임을 개설할 수 있습니다.', 'warning');
     const rawScheduledAt = $('input-time').value;
     const parsedScheduledAt = rawScheduledAt ? new Date(rawScheduledAt) : null;
+    const selectedAgeGroup = $('input-age-group').value === 'mine' ? getViewerAgeGroup() : 'all';
+    const selectedParticipantLimit = $('input-limit').value === 'custom' ? Number($('input-limit-custom')?.value) : Number($('input-limit').value);
     const activity = {
         id: crypto.randomUUID?.() || String(Date.now()),
         title: $('input-title').value.trim(), purpose: $('input-purpose').value.trim(),
         description: $('input-desc').value.trim(), location: $('input-location').value.trim(),
         scheduledAt: parsedScheduledAt && Number.isFinite(parsedScheduledAt.getTime()) ? parsedScheduledAt.toISOString() : '',
-        maxParticipants: Number($('input-limit').value), creatorId: state.user.id, hostTrustScore: state.user.trustScore,
-        category: $('input-category').value, categoryFamily: activityFamilyForType($('input-category').value), ageGroup: $('input-age-group').value,
-        conversationLevel: $('input-conversation-level').value, beginnerFriendly: $('input-beginner-friendly').checked, durationMinutes: Number($('input-duration').value),
+        maxParticipants: selectedParticipantLimit, creatorId: state.user.id, hostTrustScore: state.user.trustScore,
+        category: $('input-category').value, categoryFamily: activityFamilyForType($('input-category').value), ageGroup: selectedAgeGroup,
+        conversationLevel: $('input-conversation-level').value, beginnerFriendly: true, durationMinutes: Number($('input-duration').value),
         participants: 1, participantIds: [state.user.id], status: 'pending'
     };
     ensureGroupMetadata(activity);
@@ -2476,7 +2536,10 @@ function showFeedback(message, safe) {
 }
 
 async function toggleParticipation(groupId) {
-    if (!state.user) return setStatus('로그인 후 참여할 수 있습니다.', 'warning');
+    if (!state.user) {
+        openLogin();
+        return setStatus('로그인하면 참여 신청을 이어갈 수 있습니다.', 'warning');
+    }
     const group = state.groups.find((item) => item.id === groupId);
     if (!group || group.status !== 'recruiting') return setStatus('현재 참여할 수 없는 모임입니다.', 'warning');
     const joined = state.joinedGroupIds.has(groupId);
@@ -2504,7 +2567,7 @@ async function toggleParticipation(groupId) {
                 queueParticipationNotification(group, 'joined');
                 upsertActivityHistory('joined', group);
                 state.remoteJoinedGroupIds?.add(String(groupId));
-                setStatus(`'${group.title}' 모임에 참여했습니다.`, 'success');
+                setStatus(`'${group.title}' 모임에 참여했습니다. 활동 기록에서 공지방을 열 수 있어요.`, 'success');
                 queueGenderBalanceNotification(group);
                 queueUnderfilledNotification(group);
             }
@@ -2532,7 +2595,7 @@ async function toggleParticipation(groupId) {
         state.joinedGroupIds.add(groupId);
         recordParticipationEvent(group, 'joined');
         queueParticipationNotification(group, 'joined');
-        setStatus(`'${group.title}' 모임에 참여했습니다.`, 'success');
+        setStatus(`'${group.title}' 모임에 참여했습니다. 활동 기록에서 공지방을 열 수 있어요.`, 'success');
         upsertActivityHistory('joined', group);
         queueGenderBalanceNotification(group);
         queueUnderfilledNotification(group);
@@ -2718,7 +2781,13 @@ function openCreate() {
     setStatus('새 모임 정보를 입력한 뒤 안전 검토 후 모임 등록을 눌러 주세요.', 'info');
     return true;
 }
-function closeCreate() { elements.createModal.classList.add('hidden'); elements.form.reset(); elements.feedback.classList.add('hidden'); }
+function closeCreate() {
+    elements.createModal.classList.add('hidden');
+    elements.form.reset();
+    const customLimit = $('input-limit-custom');
+    if (customLimit) { customLimit.value = ''; customLimit.classList.add('hidden'); }
+    elements.feedback.classList.add('hidden');
+}
 
 function applyGroupSearch() {
     state.filters.query = elements.search.value.trim();
@@ -2741,9 +2810,7 @@ function handleStaticButtonClick(button, event) {
         'btn-signup': openSignup,
         'btn-close-login': closeLogin,
         'btn-close-signup': closeSignup,
-        'btn-create': openCreate,
         'nav-create': openCreate,
-        'btn-create-main': openCreate,
         'btn-profile': openProfile,
         'btn-close-profile': closeProfile,
         'btn-logout': logout,
@@ -2778,7 +2845,7 @@ function init() {
         localStorage.setItem(USER_KEY, JSON.stringify(state.user));
     }
     state.filters.ageGroup = 'all';
-    persistence.load(); loadNotifications(); renderCategoryOptions(); migrateCurrentUserAccount(state.user); syncActivityHistory(); updateNav(); renderGroups(); cancelUnderfilledGroups(); setView(viewFromLocation(), false, false);
+    persistence.load(); loadNotifications(); renderCategoryOptions(); setupParticipantLimitInput(); removeBeginnerGuidance(); migrateCurrentUserAccount(state.user); syncActivityHistory(); updateNav(); renderGroups(); cancelUnderfilledGroups(); setView(viewFromLocation(), false, false);
     elements.profileForm.addEventListener('submit', submitProfile);
     $('signup-id').addEventListener('input', () => { signupState.idAvailable = false; signupState.idCheckedId = ''; $('signup-id').dataset.checkedId = ''; $('signup-id').dataset.idAvailable = 'false'; $('signup-id-status').textContent = '아이디가 변경되었습니다. 다시 중복 확인해 주세요.'; $('signup-id-status').dataset.tone = 'info'; });
     $('signup-password').addEventListener('input', validateSignupPassword);
@@ -2812,6 +2879,12 @@ function init() {
 document.addEventListener('click', (event) => {
     const button = event.target.closest?.('button');
     if (button && handleStaticButtonClick(button, event)) return;
+    const historyTab = event.target.closest?.('[data-history-tab]');
+    if (historyTab) {
+        event.preventDefault();
+        setHistoryTab(historyTab.dataset.historyTab);
+        return;
+    }
     const star = event.target.closest?.('.star-picker button[data-rating]');
     if (star) {
         event.preventDefault();
