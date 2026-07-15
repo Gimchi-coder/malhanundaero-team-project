@@ -78,6 +78,12 @@ patterns before operational records are written.
 - Appearance, credentials, gender, and romantic suitability must not be represented.
 - Trust changes must be exposed only through the public trust projection.
 
+## Activity history
+
+- 정상: 로그인한 사용자가 활동 A에 참여하고 모임 B를 만든 뒤 마이페이지에서 `내가 신청한 활동`과 `내가 만든 모임`에 각각 분리되어 표시되는지 확인한다.
+- 영속성: 로그아웃 후 같은 계정으로 다시 로그인해도 두 기록이 유지되는지 확인한다.
+- 예외: 활동 A의 `참여 취소`를 누른 뒤 신청 목록에서 A가 제거되고, 만든 모임 B의 기록에는 영향을 주지 않는지 확인한다.
+
 ## Evidence
 
 Record browser/version, timestamps, and deviations from the scenarios here before production
