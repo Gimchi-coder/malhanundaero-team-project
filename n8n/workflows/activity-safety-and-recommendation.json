@@ -28,20 +28,22 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{$env.SAFETY_CLASSIFIER_URL}}",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
         "sendBody": true,
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
-              "name": "Authorization",
-              "value": "={{$env.MODERATION_GATEWAY_TOKEN ? 'Bearer ' + $env.MODERATION_GATEWAY_TOKEN : ''}}"
+              "name": "Content-Type",
+              "value": "application/json"
             }
           ]
         },
         "specifyBody": "json",
-        "jsonBody": "={{ { requestId: $json.requestId, operation: $json.operation, text: $json.normalizedText, activity: $json.activity, preferences: $json.preferences } }}",
-        "options": { "timeout": 8000 },
+        "jsonBody": "={{ { model: 'gpt-4o-mini', temperature: 0, max_tokens: 700, response_format: { type: 'json_object' }, messages: [ { role: 'system', content: `너는 동네 광장의 안전 검토·활동 추천 분류기다. 이 서비스는 외로움을 줄이고 공개된 장소에서 건전한 관심사 활동으로 사람을 연결한다. 입력의 표면적인 단어만 보지 말고 문맥, 의도, 완곡어법, 초성·자모·띄어쓰기 우회, 은어를 함께 판단한다. 다음은 안전 검토 규칙이다. 담배·주류·약물 구매나 대리구매, 불법·위험 행위, 사기·투자·금전 모집, 성적 만남·조건만남·데이트 목적, 괴롭힘·혐오·협박, 개인정보 수집·거래, 앱의 활동 취지와 무관한 모집은 승인하지 않는다. 단순한 예방 교육·뉴스·상담·비판적 언급은 문맥상 실제 행위 모집이 아니면 승인할 수 있다. 애매하거나 정보가 부족하면 approved가 아니라 manual_review로 보낸다. safety_review일 때는 다음 JSON만 출력한다: {decision: 'approved|held|manual_review', categories: string[], confidence: 'high|medium|low', explanation: string, guidance: string, policyVersion: 'safety-v1'}. 명백한 금지 의도는 held, 판단이 애매하면 manual_review, 건전한 공개 활동이면 approved다. recommend일 때는 입력 activities 중 실제 id만 골라 다음 JSON만 출력한다: {recommendations: [{activityId: string, reason: string, fit: number}], policyVersion: 'recommendation-v1'}. 추천은 최대 3개이며 fit은 0과 1 사이 숫자다. JSON 외의 말과 마크다운은 출력하지 않는다.` }, { role: 'user', content: JSON.stringify({ requestId: $json.requestId, operation: $json.operation, normalizedText: $json.normalizedText, activity: $json.activity, activities: $json.activities, preferences: $json.preferences }) } ] } }}",
+        "options": { "timeout": 15000 },
         "continueOnFail": true
       },
       "id": "semantic-review",
@@ -52,7 +54,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const input = $('검증 및 정규화').first().json;\nif (input.operation === 'recommend') {\n  const recommendations = Array.isArray($json.recommendations) ? $json.recommendations : [];\n  return [{ json: { requestId: input.requestId, recommendations, message: recommendations.length ? '' : '조건에 맞는 활동이 없습니다.', policyVersion: $json.policyVersion || 'recommendation-v1' } }];\n}\nconst result = $json.error ? { decision: 'manual_review', categories: [], confidence: 'low', explanation: '의미 검토 서비스를 사용할 수 없어 운영자 검토로 전환했습니다.', guidance: '잠시 후 다시 시도하거나 운영자 검토를 요청해 주세요.' } : $json;\nconst decision = result.decision || (result.risk === 'high' ? 'held' : result.confidence === 'low' ? 'manual_review' : 'approved');\nreturn [{ json: { requestId: result.requestId || input.requestId, decision: ['approved', 'held', 'manual_review', 'unavailable'].includes(decision) ? decision : 'manual_review', categories: result.categories || [], confidence: result.confidence || 'low', explanation: result.explanation || '검토 결과를 확인해 주세요.', guidance: result.guidance || '내용을 수정하거나 운영자 검토를 요청해 주세요.', policyVersion: result.policyVersion || 'safety-v1' } }];"
+        "jsCode": "const input = $('검증 및 정규화').first().json;\n\nfunction parseModelResult(value) {\n  if (value && typeof value === 'object') return value;\n  if (typeof value !== 'string') return null;\n  const cleaned = value.trim().replace(/^```(?:json)?\\s*/i, '').replace(/\\s*```$/, '');\n  try { return JSON.parse(cleaned); } catch { return null; }\n}\n\nconst content = $json?.choices?.[0]?.message?.content ?? $json?.output_text ?? $json?.response ?? $json?.content;\nconst parsed = parseModelResult(content);\nconst providerFailed = Boolean($json?.error) || !parsed;\n\nif (input.operation === 'recommend') {\n  const allowedIds = new Set((input.activities || []).map((activity) => String(activity.id || '')).filter(Boolean));\n  const recommendations = providerFailed || !Array.isArray(parsed?.recommendations) ? [] : parsed.recommendations\n    .map((item) => ({ activityId: String(item?.activityId || item?.id || ''), reason: String(item?.reason || ''), fit: Math.max(0, Math.min(1, Number(item?.fit) || 0)) }))\n    .filter((item) => allowedIds.has(item.activityId) && item.reason)\n    .slice(0, 3);\n  return [{ json: { requestId: input.requestId, recommendations, message: recommendations.length ? '' : '조건에 맞는 활동이 없습니다. 잠시 후 다시 시도해 주세요.', policyVersion: parsed?.policyVersion || 'recommendation-v1' } }];\n}\n\nconst result = providerFailed ? { decision: 'manual_review', categories: [], confidence: 'low', explanation: '의미 검토 서비스를 사용할 수 없어 운영자 검토로 전환했습니다.', guidance: '잠시 후 다시 시도하거나 운영자 검토를 요청해 주세요.' } : parsed;\nconst decisionMap = { allow: 'approved', approved: 'approved', revise: 'held', block: 'held', held: 'held', review: 'manual_review', manual_review: 'manual_review', unavailable: 'unavailable' };\nconst decision = decisionMap[result.decision] || (result.risk === 'high' ? 'held' : 'manual_review');\nreturn [{ json: { requestId: input.requestId, decision, categories: Array.isArray(result.categories) ? result.categories.slice(0, 5) : [], confidence: ['high', 'medium', 'low'].includes(result.confidence) ? result.confidence : 'low', explanation: String(result.explanation || '검토 결과를 확인해 주세요.'), guidance: String(result.guidance || '내용을 수정하거나 운영자 검토를 요청해 주세요.'), policyVersion: result.policyVersion || 'safety-v1' } }];"
       },
       "id": "decision",
       "name": "보류·게시 분기",
