@@ -83,6 +83,7 @@ body[data-view="guide"] .hero-section, body[data-view="guide"] #connection-start
 .eyebrow { margin-bottom: 10px; color: var(--accent-dark); font-size: .7rem; font-weight: 900; letter-spacing: .14em; }
 h1, h2, h3, h4 { color: var(--ink); letter-spacing: -.055em; line-height: 1.2; overflow-wrap: break-word; text-wrap: balance; }
 h1 { max-width: 680px; font-size: clamp(2.9rem, 7vw, 5.6rem); font-weight: 900; }
+.hero-line { display: inline-block; white-space: nowrap; }
 h1 em { color: var(--accent); font-style: normal; }
 h2 { font-size: clamp(1.5rem, 3vw, 2.15rem); }
 .hero-description { max-width: 590px; margin-top: 20px; color: var(--muted); font-size: clamp(.9rem, 1.7vw, 1.02rem); overflow-wrap: break-word; word-break: keep-all; }
@@ -243,7 +244,7 @@ select { appearance: auto; }.form-group input:focus, .form-group select:focus, .
 @keyframes card-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 
 @media (max-width: 680px) {
-    h1 { font-size: clamp(2.35rem, 12vw, 4rem); }
+    h1 { font-size: clamp(1.85rem, 8.5vw, 4rem); }
     .btn-primary, .btn-ghost, .btn-outline { font-size: clamp(.72rem, 3.2vw, .9rem); }
     .section-heading p:not(.eyebrow), .connection-heading p:not(.eyebrow) { font-size: clamp(.78rem, 3.2vw, .9rem); }
 }
