@@ -1568,11 +1568,15 @@ function openActivityRoom(groupId) {
     renderActivityRoomChat(groupId);
     elements.roomChatStatus.textContent = '';
     elements.roomChatStatus.dataset.tone = '';
+    elements.notificationModal.classList.add('hidden');
+    elements.notificationModal.setAttribute('aria-hidden', 'true');
     elements.activityRoomModal.classList.remove('hidden');
+    elements.activityRoomModal.setAttribute('aria-hidden', 'false');
 }
 
 function closeActivityRoom() {
     elements.activityRoomModal.classList.add('hidden');
+    elements.activityRoomModal.setAttribute('aria-hidden', 'true');
     elements.roomMessages.replaceChildren();
     elements.roomChatMessages.replaceChildren();
     elements.roomChatInput.value = '';
@@ -1742,10 +1746,12 @@ function openNotifications() {
     if (!state.user) return openLogin();
     renderNotifications();
     elements.notificationModal.classList.remove('hidden');
+    elements.notificationModal.setAttribute('aria-hidden', 'false');
 }
 
 function closeNotifications() {
     elements.notificationModal.classList.add('hidden');
+    elements.notificationModal.setAttribute('aria-hidden', 'true');
 }
 
 function queueParticipationNotification(group, action) {

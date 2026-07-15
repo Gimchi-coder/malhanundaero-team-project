@@ -14,8 +14,11 @@ for (const family of ['study', 'hobby', 'sports', 'social', 'game', 'culture', '
 }
 assert.doesNotMatch(source.slice(source.indexOf('function renderGroups'), source.indexOf('function renderBoard')), /중심 모임/);
 assert.match(source.slice(source.indexOf('function openActivityRoom'), source.indexOf('function closeActivityRoom')), /closeNotifications\(\)/);
+assert.match(source.slice(source.indexOf('function openActivityRoom'), source.indexOf('function closeActivityRoom')), /notificationModal\.classList\.add\('hidden'\)/);
+assert.match(source.slice(source.indexOf('function openActivityRoom'), source.indexOf('function closeActivityRoom')), /activityRoomModal\.setAttribute\('aria-hidden', 'false'\)/);
 assert.match(html, /id="modal-report"/);
 assert.match(html, /id="form-report"/);
+assert.match(html, /id="btn-submit-report"[^>]*>신고 완료<\/button>/);
 assert.match(source, /신고가 완료되었습니다/);
 
-console.log(JSON.stringify({ passed: true, suite: 'activity-examples', checks: 15 }));
+console.log(JSON.stringify({ passed: true, suite: 'activity-examples', checks: 18 }));
