@@ -790,24 +790,24 @@ const ACTIVITY_FAMILIES = [
 ];
 
 const ACTIVITY_EXAMPLES = [
-    { family: 'study', title: '한 페이지씩 읽는 저녁 독서', description: '말하지 않아도 괜찮고, 마지막에 한 줄만 나눠요.', temperature: 48 },
-    { family: 'study', title: '퇴근 후 40분 코딩 함께하기', description: '각자 할 일을 가져와 조용히 집중해요.', temperature: 56 },
-    { family: 'hobby', title: '동네 사진 한 컷 산책', description: '잘 찍지 않아도 괜찮은 느린 사진 산책이에요.', temperature: 52 },
-    { family: 'hobby', title: '뜨개질 손을 쉬지 않는 시간', description: '각자 만들며 필요할 때만 대화해요.', temperature: 60 },
-    { family: 'sports', title: '천천히 동네 한 바퀴', description: '속도보다 함께 걷는 시간을 소중히 여겨요.', temperature: 64 },
-    { family: 'sports', title: '자전거 길을 가볍게 익히기', description: '각자 페이스를 지키며 쉬어 가요.', temperature: 55 },
-    { family: 'social', title: '커피 한 잔, 가벼운 안부', description: '처음이라도 부담 없이 1시간만 만나요.', temperature: 54 },
-    { family: 'social', title: '동네 브런치 한 접시', description: '대화가 길어지지 않아도 괜찮은 느슨한 자리예요.', temperature: 49 },
-    { family: 'game', title: '협동 게임 한 판', description: '승패보다 같이 익히는 과정을 즐겨요.', temperature: 67 },
-    { family: 'game', title: '처음 하는 보드게임 배우기', description: '규칙을 천천히 설명하며 함께 시작해요.', temperature: 61 },
-    { family: 'culture', title: '전시 보고 각자 한 줄 감상', description: '감상을 길게 말하지 않아도 괜찮아요.', temperature: 58 },
-    { family: 'culture', title: '동네 극장 조용한 관람', description: '보고 난 뒤 원하면 짧은 감상만 나눠요.', temperature: 70 },
-    { family: 'community', title: '주말 공원 플로깅', description: '동네를 가볍게 돌며 작은 변화를 만들어요.', temperature: 72 },
-    { family: 'community', title: '보호소 물품 정리 돕기', description: '필요한 일을 나누며 무리 없이 참여해요.', temperature: 65 },
-    { family: 'project', title: '작은 앱 아이디어 노트', description: '완성보다 시작을 함께 응원하는 모임이에요.', temperature: 63 },
-    { family: 'project', title: '포트폴리오 한 페이지 다듬기', description: '각자 작업하고 막힐 때만 가볍게 물어봐요.', temperature: 57 },
-    { family: 'other', title: '도예 소품 한 가지 만들기', description: '처음 만져봐도 괜찮은 원데이 작업이에요.', temperature: 50 },
-    { family: 'other', title: '계절 꽃 한 송이 고르기', description: '가까운 동네에서 취향을 천천히 나눠요.', temperature: 46 }
+    { family: 'study', title: '한 페이지씩 읽는 저녁 독서', description: '말하지 않아도 괜찮고, 마지막에 한 줄만 나눠요.' },
+    { family: 'study', title: '퇴근 후 40분 코딩 함께하기', description: '각자 할 일을 가져와 조용히 집중해요.' },
+    { family: 'hobby', title: '동네 사진 한 컷 산책', description: '잘 찍지 않아도 괜찮은 느린 사진 산책이에요.' },
+    { family: 'hobby', title: '뜨개질 손을 쉬지 않는 시간', description: '각자 만들며 필요할 때만 대화해요.' },
+    { family: 'sports', title: '천천히 동네 한 바퀴', description: '속도보다 함께 걷는 시간을 소중히 여겨요.' },
+    { family: 'sports', title: '자전거 길을 가볍게 익히기', description: '각자 페이스를 지키며 쉬어 가요.' },
+    { family: 'social', title: '커피 한 잔, 가벼운 안부', description: '처음이라도 부담 없이 1시간만 만나요.' },
+    { family: 'social', title: '동네 브런치 한 접시', description: '대화가 길어지지 않아도 괜찮은 느슨한 자리예요.' },
+    { family: 'game', title: '협동 게임 한 판', description: '승패보다 같이 익히는 과정을 즐겨요.' },
+    { family: 'game', title: '처음 하는 보드게임 배우기', description: '규칙을 천천히 설명하며 함께 시작해요.' },
+    { family: 'culture', title: '전시 보고 각자 한 줄 감상', description: '감상을 길게 말하지 않아도 괜찮아요.' },
+    { family: 'culture', title: '동네 극장 조용한 관람', description: '보고 난 뒤 원하면 짧은 감상만 나눠요.' },
+    { family: 'community', title: '주말 공원 플로깅', description: '동네를 가볍게 돌며 작은 변화를 만들어요.' },
+    { family: 'community', title: '보호소 물품 정리 돕기', description: '필요한 일을 나누며 무리 없이 참여해요.' },
+    { family: 'project', title: '작은 앱 아이디어 노트', description: '완성보다 시작을 함께 응원하는 모임이에요.' },
+    { family: 'project', title: '포트폴리오 한 페이지 다듬기', description: '각자 작업하고 막힐 때만 가볍게 물어봐요.' },
+    { family: 'other', title: '도예 소품 한 가지 만들기', description: '처음 만져봐도 괜찮은 원데이 작업이에요.' },
+    { family: 'other', title: '계절 꽃 한 송이 고르기', description: '가까운 동네에서 취향을 천천히 나눠요.' }
 ];
 
 function activityFamilyForType(type) {
@@ -1497,8 +1497,7 @@ function renderCategoryOptions() {
             card.append(
                 createText('span', activityFamilyLabel(example.family), 'category-badge'),
                 createText('strong', example.title),
-                createText('p', example.description),
-                createText('small', `참여 온도 ${example.temperature}°C`, 'example-temperature')
+                createText('p', example.description)
             );
             card.addEventListener('click', () => {
                 state.filters.category = example.family;
