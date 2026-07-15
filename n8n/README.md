@@ -11,8 +11,8 @@
 
 - `workflows/activity-safety-and-recommendation.json`: n8n import용 workflow
 - `../specs/001-dongne-gwangjang/contracts/automation.md`: 입력·출력 계약
-- `/Users/cw/Downloads/Censorship_Agent/scripts/run_server.py`: 규칙 + AI 문맥 분류를
-  제공하는 보호된 안전 검토 게이트웨이(로컬/서버에서 실행)
+- `/Users/cw/Downloads/Censorship_Agent/scripts/run_server.py`: 외부 서버 연동이 필요한
+  경우 사용할 수 있는 규칙 + AI 문맥 분류 게이트웨이
 
 추천 operation의 운영 경로는 현재 모집 중인 활동만 지식원으로 사용한다. 활동 데이터의
 인제스션·임베딩·top-k 검색은 보호된 endpoint 또는 벡터 DB 경계 안에서 수행하고, 브라우저에는
@@ -21,11 +21,12 @@
 
 ## 운영 규칙
 
-- provider credential은 n8n 환경변수 또는 credential store에만 둔다.
-- `SAFETY_CLASSIFIER_URL`은 게이트웨이의 `/moderate` 주소로 설정하고,
-  `MODERATION_GATEWAY_TOKEN`을 사용하면 n8n과 게이트웨이 사이를 토큰으로 보호한다.
-- 게이트웨이는 `OPENAI_API_KEY`를 서버 환경변수에서만 읽는다. 브라우저 `config.js`와
-  Git에는 키를 넣지 않는다.
+- provider credential은 n8n Credential store에만 둔다.
+- 기본 workflow는 n8n의 `HTTP Request` 노드에서 `OpenAI` predefined credential을 사용해
+  OpenAI Chat Completions API를 호출한다. API 키는 workflow JSON, 브라우저 `config.js`,
+  Git에 들어가지 않는다.
+- 별도 Censorship_Agent 게이트웨이를 사용할 때만 `SAFETY_CLASSIFIER_URL`과
+  `MODERATION_GATEWAY_TOKEN` 방식을 사용한다.
 - 분류 실패·낮은 신뢰도·응답 형식 오류는 `manual_review`로 처리한다.
 - workflow 변경 후 safe/direct/obfuscated/failure 4개 입력을 재생한다.
 - 실제 운영 전에는 운영자 검토 큐와 보존·삭제 정책을 별도로 확정한다.
