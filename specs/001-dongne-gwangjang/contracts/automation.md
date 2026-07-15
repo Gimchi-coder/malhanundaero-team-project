@@ -2,12 +2,12 @@
 
 ## Purpose
 
-This contract is the stable boundary between the browser, n8n, and a protected semantic AI
-provider. The browser must not depend on provider-specific response fields.
+This contract is the stable boundary between the browser, the Vercel Serverless Function, and
+the protected semantic AI provider. The browser must not depend on provider-specific response
+fields.
 
-The current protected classifier implementation is the external
-`/Users/cw/Downloads/Censorship_Agent` gateway. It reads provider credentials only from its
-server environment and exposes `/moderate`; n8n is the preferred public-facing boundary.
+The Vercel function reads provider credentials only from server environment variables and
+records the OpenAI generation in Langfuse. No provider secret is sent to the browser.
 
 ## Input
 

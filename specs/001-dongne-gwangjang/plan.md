@@ -96,16 +96,16 @@ review-set tests.
 ## Course-Aligned Delivery Plan
 
 The implementation will demonstrate the smallest complete loop required by the course and
-rubric: browser input → n8n-compatible automation contract → AI-assisted decision → persisted
+rubric: browser input → Vercel Serverless automation contract → AI-assisted decision → persisted
 result → observable validation evidence.
 
 ### Automation boundary
 
-`n8n/workflows/activity-safety-and-recommendation.json` is the portable workflow artifact. It
-uses a webhook-shaped input, schema validation, normalization, a semantic-review boundary,
-explicit decision branches, and a response contract. `config.js` contains only public endpoint
-configuration. The browser uses a deterministic local fallback when no protected webhook is
-configured; it never contains a provider secret.
+`api/automation.js` is the deployable workflow boundary. It uses a JSON HTTP input, schema
+validation, normalization, a Langfuse-observed OpenAI call, explicit decision branches, and a
+response contract. `config.js` contains only public endpoint configuration. The browser uses a
+deterministic local fallback when no protected server is configured; it never contains a
+provider secret.
 
 ### AI safety design
 
@@ -124,7 +124,7 @@ compared without changing the application contract.
 ### Rubric evidence
 
 - Problem: `team_prd.md`, hero copy, and the primary browse-to-join journey.
-- n8n design: workflow JSON, contract, and quickstart replay steps.
+- Vercel·Langfuse design: serverless function, contract, traces, and quickstart replay steps.
 - Stability: validation states, fail-closed behavior, schema checks, and retry path.
 - Reuse: contracts, versioned policy configuration, and isolated adapter functions.
 - Presentation: quickstart demo script and recorded validation evidence.

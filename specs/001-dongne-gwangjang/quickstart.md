@@ -5,11 +5,10 @@
 - A modern browser.
 - The repository checked out locally.
 - For local demo mode, leave provider placeholders in `config.js`.
-- For persistent mode, configure public Supabase settings and route AI screening through the
-  protected server boundary described in the plan.
-- To exercise the real semantic safety agent, run
-  `/Users/cw/Downloads/Censorship_Agent/scripts/run_server.py` with provider credentials in
-  environment variables, then point n8n's `SAFETY_CLASSIFIER_URL` at its `/moderate` endpoint.
+- For persistent mode, configure public Supabase settings and the Vercel server environment
+  variables in `.env.example`.
+- To exercise the real semantic safety agent, deploy `/api/automation` with OpenAI and Langfuse
+  credentials stored only in Vercel Environment Variables.
 
 ## Run
 
@@ -47,8 +46,8 @@ AI secret in `config.js` or browser source.
 ```bash
 node --check main.js
 node --check config.js
+node --check api/automation.js
 node tests/evaluate.mjs
-node -e "JSON.parse(require('fs').readFileSync('n8n/workflows/activity-safety-and-recommendation.json','utf8')); console.log('n8n workflow JSON: PASS')"
 git diff --check
 ```
 
@@ -62,20 +61,19 @@ Expected evidence: the 50-case safety set reports at least 45 unsafe cases as `h
    reason; confirm no participant private identity is shown.
 3. Enter an unmatched interest and confirm the clarifying empty state.
 
-### n8n replay
+### Vercel endpoint replay
 
-1. Import `n8n/workflows/activity-safety-and-recommendation.json` into n8n.
-2. Configure the protected classifier URL through the n8n environment, not browser source.
-3. POST the contract-shaped sample from `contracts/automation.md` to the test webhook.
-4. Replay a safe, direct prohibited, obfuscated, and classifier-failure input. Record the
+1. POST the contract-shaped sample from `contracts/automation.md` to `/api/automation`.
+2. Replay a safe, direct prohibited, obfuscated, and classifier-failure input. Record the
    response decision, category, confidence, and failure path.
+3. Confirm the resulting generation and metadata appear in Langfuse.
 
 ### Rubric evidence map
 
 | Rubric | Evidence |
 |---|---|
 | 문제 정의·독창성 | `team_prd.md`, hero copy, browse-to-join journey |
-| n8n 자동화 | imported workflow, webhook replay, explicit decision branch |
+| Vercel·Langfuse 자동화 | serverless endpoint, OpenAI generation trace, explicit decision branch |
 | 기술적 완성도·안정성 | schema contract, fixture score, retry/manual-review/fail-closed states |
 | 확장성·재사용성 | contracts, policy versions, adapter boundary, fixture runner |
 | 발표·협업 | this quickstart, 3-minute replay order, recorded evidence |

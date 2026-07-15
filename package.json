@@ -1,0 +1,31 @@
+{
+  "name": "malhanundaero-team-project-main",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Gimchi-coder/malhanundaero-team-project.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/Gimchi-coder/malhanundaero-team-project/issues"
+  },
+  "homepage": "https://github.com/Gimchi-coder/malhanundaero-team-project#readme",
+  "dependencies": {
+    "@langfuse/openai": "^5.9.1",
+    "@langfuse/otel": "^5.9.1",
+    "@opentelemetry/sdk-node": "^0.220.0",
+    "openai": "^6.47.0"
+  }
+}
