@@ -117,6 +117,7 @@ elements.applySearch = $('btn-apply-search');
 elements.createMain = $('btn-create-main');
 elements.recommendationHero = $('btn-recommendation-hero');
 elements.locationSettingsButton = $('btn-location-settings');
+elements.locationSettingsLabel = $('location-settings-label');
 elements.locationSettingsPopover = $('location-settings-popover');
 elements.locationSettingsForm = $('form-location-settings');
 elements.locationSettingsStatus = $('location-settings-status');
@@ -293,13 +294,13 @@ function toggleLocationManualField(mode) {
 function locationSettingsButtonLabel(settings) {
     const dateLabel = settings.preferredDate === localDateInputValue() ? '오늘' : `${Number(settings.preferredDate.slice(5, 7))}/${Number(settings.preferredDate.slice(8, 10))}`;
     const placeLabel = settings.locationMode === 'manual' && settings.manualLocation ? settings.manualLocation : '내 위치';
-    return `📍 ${dateLabel} · ${placeLabel}`;
+    return `${dateLabel} · ${placeLabel}`;
 }
 
 function updateLocationSettingsButton() {
-    if (!elements.locationSettingsButton) return;
+    if (!elements.locationSettingsLabel) return;
     const settings = state.user ? (state.activitySettings || getActivitySettings()) : defaultActivitySettings();
-    elements.locationSettingsButton.textContent = locationSettingsButtonLabel(settings);
+    elements.locationSettingsLabel.textContent = locationSettingsButtonLabel(settings);
 }
 
 function openLocationSettingsPopover() {
@@ -312,10 +313,12 @@ function openLocationSettingsPopover() {
     toggleLocationManualField(settings.locationMode);
     setLocationSettingsStatus();
     elements.locationSettingsPopover.classList.remove('hidden');
+    elements.locationSettingsButton.setAttribute('aria-expanded', 'true');
 }
 
 function closeLocationSettingsPopover() {
     elements.locationSettingsPopover?.classList.add('hidden');
+    elements.locationSettingsButton?.setAttribute('aria-expanded', 'false');
 }
 
 function toggleLocationSettingsPopover() {

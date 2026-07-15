@@ -125,8 +125,17 @@ h2 { font-size: clamp(1.5rem, 3vw, 2.15rem); }
 .search-input-wrap input { min-width: 0; border: 0; background: transparent; }
 .search-input-wrap input:focus { border: 0; background: transparent; }
 .search-button, .ai-recommendations-button, .create-main-button { flex: 0 0 auto; min-height: 42px; white-space: nowrap; }
+.filter-location-layout { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 18px; margin-bottom: 4px; }
+.activity-filter-stack { min-width: 0; }
 .location-quick-setting { position: relative; flex: 0 0 auto; }
-.location-settings-button { min-height: 42px; white-space: nowrap; font-size: .8rem; }
+.location-mini-card { width: 178px; }
+.location-mini-button { display: flex; align-items: center; gap: 9px; width: 100%; min-height: 67px; padding: 10px 11px; border: 1px solid #f0d9ce; border-radius: 14px; color: var(--ink); text-align: left; background: linear-gradient(145deg, #fffaf7, #fff); box-shadow: var(--shadow-sm); transition: transform var(--ease), border-color var(--ease), box-shadow var(--ease); }
+.location-mini-button:hover { border-color: var(--accent); box-shadow: 0 8px 18px rgba(239,147,104,.14); transform: translateY(-1px); }
+.location-mini-icon { display: grid; place-items: center; flex: 0 0 auto; width: 29px; height: 29px; border-radius: 10px; color: var(--accent-dark); background: var(--accent-soft); font-size: 1.05rem; }
+.location-mini-copy { display: grid; min-width: 0; gap: 2px; }
+.location-mini-copy small { color: var(--muted-light); font-size: .61rem; font-weight: 800; }
+.location-mini-copy strong { overflow: hidden; color: var(--ink); font-size: .73rem; text-overflow: ellipsis; white-space: nowrap; }
+.location-mini-arrow { margin-left: auto; color: var(--muted-light); font-size: 1.2rem; line-height: 1; }
 .location-settings-popover { position: absolute; top: calc(100% + 8px); right: 0; z-index: 30; width: 240px; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); box-shadow: var(--shadow-lg); }
 .location-settings-popover .form-group { margin-bottom: 10px; }
 .location-mode-fieldset { display: grid; gap: 6px; margin: 0 0 10px; padding: 0; border: 0; }

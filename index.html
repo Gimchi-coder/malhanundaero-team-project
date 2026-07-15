@@ -82,8 +82,24 @@
                     <button id="btn-apply-search" class="btn-outline search-button" type="button">검색</button>
                     <button id="btn-ai-recommendations" class="btn-outline ai-recommendations-button" type="button">✦ AI 추천 모임 보기</button>
                 </div>
-                <div class="location-quick-setting">
-                    <button id="btn-location-settings" class="btn-outline location-settings-button" type="button">📍 오늘 · 내 위치</button>
+                <button id="btn-create-main" class="btn-primary create-main-button" type="button">＋ 모임 만들기</button>
+            </div>
+
+            <div class="filter-location-layout">
+                <div class="activity-filter-stack">
+                    <div class="filter-group">
+                        <span class="filter-label">활동별</span><div id="category-filter-buttons" class="category-filter-buttons" aria-label="활동별 분류"></div>
+                    </div>
+                    <div class="filter-group">
+                        <span class="filter-label">참여 연령</span><div id="age-filter-buttons" class="age-filter-buttons" aria-label="참여 연령 필터"></div>
+                    </div>
+                </div>
+                <div class="location-quick-setting location-mini-card">
+                    <button id="btn-location-settings" class="location-mini-button" type="button" aria-haspopup="dialog" aria-expanded="false">
+                        <span class="location-mini-icon" aria-hidden="true">⌖</span>
+                        <span class="location-mini-copy"><small>거리 기준</small><strong id="location-settings-label">오늘 · 내 위치</strong></span>
+                        <span class="location-mini-arrow" aria-hidden="true">›</span>
+                    </button>
                     <div id="location-settings-popover" class="location-settings-popover hidden" role="dialog" aria-label="참여 날짜와 위치 설정">
                         <form id="form-location-settings" novalidate>
                             <div class="form-group"><label for="input-location-date">참여를 생각하는 날짜</label><input type="date" id="input-location-date" required></div>
@@ -94,14 +110,6 @@
                         </form>
                     </div>
                 </div>
-                <button id="btn-create-main" class="btn-primary create-main-button" type="button">＋ 모임 만들기</button>
-            </div>
-
-            <div class="filter-group">
-                <span class="filter-label">활동별</span><div id="category-filter-buttons" class="category-filter-buttons" aria-label="활동별 분류"></div>
-            </div>
-            <div class="filter-group">
-                <span class="filter-label">참여 연령</span><div id="age-filter-buttons" class="age-filter-buttons" aria-label="참여 연령 필터"></div>
             </div>
             <details class="activity-examples-reference">
                 <summary><strong>어떤 활동이 있나요?</strong><span>활동 예시 보기 ＋</span></summary>
