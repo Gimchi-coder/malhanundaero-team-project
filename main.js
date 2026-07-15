@@ -12,6 +12,9 @@ const ACCOUNTS_KEY = 'dg_accounts_v1';
 const PRIVATE_PROFILE_KEY = 'dg_private_profile_v1';
 const REPORTS_KEY = 'dg_reports_v1';
 const REVIEWS_KEY = 'dg_reviews_v1';
+const CONNECTION_CHECKINS_KEY = 'dg_connection_checkins_v1';
+const PARTICIPATION_LOG_KEY = 'dg_participation_log_v1';
+const ACTIVITY_CHAT_KEY = 'dg_activity_chat_v1';
 const TRUST_KEY = 'dg_trust_projection_v1';
 const NOTIFICATIONS_KEY = 'dg_notifications_v1';
 const POSTS_KEY = 'dg_board_posts_v1';
@@ -100,6 +103,21 @@ elements.createGuide = $('btn-create-guide');
 elements.ageFilters = $('age-filter-buttons');
 elements.categoryFilters = $('category-filter-buttons');
 elements.groupCount = $('group-count');
+elements.historyList = $('history-list');
+elements.historyEmpty = $('history-empty');
+elements.historyCount = $('history-count');
+elements.historyCompletedCount = $('history-completed-count');
+elements.historyRevisitCount = $('history-revisit-count');
+elements.historyTrustScore = $('history-trust-score');
+elements.activityRoomModal = $('modal-activity-room');
+elements.closeActivityRoom = $('btn-close-activity-room');
+elements.roomTitle = $('room-title');
+elements.roomMeta = $('room-meta');
+elements.roomMessages = $('room-messages');
+elements.roomChatMessages = $('room-chat-messages');
+elements.roomChatForm = $('form-room-chat');
+elements.roomChatInput = $('input-room-chat');
+elements.roomChatStatus = $('room-chat-status');
 elements.boardList = $('board-list');
 elements.boardEmpty = $('board-empty');
 elements.categoryList = $('category-list');
@@ -319,6 +337,11 @@ function getTrustProjection(userId, fallback = TRUST_BASELINE) {
 }
 
 function calculateTrustDelta(values) {
+    const numericValues = values.map((value) => Number(value));
+    if (numericValues.length && numericValues.every((value) => Number.isFinite(value) && value >= 1 && value <= 5)) {
+        const average = numericValues.reduce((sum, value) => sum + value, 0) / numericValues.length;
+        return Math.round((average - 3) * 2);
+    }
     const positive = values.filter((value) => value === 'positive').length;
     const negative = values.filter((value) => value === 'negative').length;
     return positive * TRUST_POSITIVE_DELTA - negative * TRUST_NEGATIVE_DELTA;
@@ -425,10 +448,30 @@ function activityFamilyLabel(familyId) {
     return ACTIVITY_FAMILIES.find((family) => family.id === familyId)?.label || '기타';
 }
 
+const CONVERSATION_LEVEL_LABELS = {
+    quiet: '대화 부담 낮음',
+    light_conversation: '대화 부담 보통',
+    active: '대화 중심'
+};
+
+function conversationLevelLabel(level) {
+    return CONVERSATION_LEVEL_LABELS[level] || CONVERSATION_LEVEL_LABELS.light_conversation;
+}
+
+function inferConversationLevel(group) {
+    const text = normalizeSafetyText(`${group.title || ''} ${group.purpose || ''} ${group.description || ''}`);
+    if (/말없이|각자|조용|대화강요없/.test(text)) return 'quiet';
+    if (/대화|이야기|공유|토론|회화|합주|합창/.test(text)) return 'light_conversation';
+    return 'active';
+}
+
 function ensureGroupMetadata(group) {
     group.ageGroup = group.ageGroup || 'all';
     group.category = group.category || '기타 모임';
     group.categoryFamily = group.categoryFamily && group.categoryFamily !== 'other' ? group.categoryFamily : activityFamilyForType(group.category);
+    group.conversationLevel = group.conversationLevel || inferConversationLevel(group);
+    group.beginnerFriendly = group.beginnerFriendly !== false;
+    group.durationMinutes = Number(group.durationMinutes) > 0 ? Number(group.durationMinutes) : 60;
     group.hostTrustScore = getTrustProjection(group.creatorId, group.hostTrustScore);
     if (!privateGroupState.has(group.id)) {
         privateGroupState.set(group.id, group.privateGenderCounts || { male: group.participants || 0, female: 0 });
@@ -723,6 +766,13 @@ function formatDate(value) {
     return Number.isNaN(date.getTime()) ? '일정 미정' : date.toLocaleString('ko-KR', { dateStyle: 'medium', timeStyle: 'short' });
 }
 
+function formatDuration(minutes) {
+    const value = Number(minutes);
+    if (value >= 180) return '3시간 이상';
+    if (value >= 60) return `${Math.floor(value / 60)}시간${value % 60 ? ` ${value % 60}분` : ''}`;
+    return `${value || 60}분`;
+}
+
 function statusLabel(status) {
     return { recruiting: '모집 중', confirmed: '확정', cancelled: '취소됨', pending: '검토 중', completed: '완료' }[status] || status;
 }
@@ -736,7 +786,8 @@ function createText(tag, value, className) {
 
 function groupMatchesFilters(group) {
     const query = normalizeSafetyText(state.filters.query);
-    const searchable = normalizeSafetyText(`${group.title} ${group.purpose} ${group.description} ${group.category}`);
+    ensureGroupMetadata(group);
+    const searchable = normalizeSafetyText(`${group.title} ${group.purpose} ${group.description} ${group.category} ${conversationLevelLabel(group.conversationLevel)}`);
     const queryMatches = !query || searchable.includes(query);
     const selectedAge = state.filters.ageGroup === 'mine' ? getViewerAgeGroup() : state.filters.ageGroup;
     const ageMatches = selectedAge === 'all' || group.ageGroup === 'all' || group.ageGroup === selectedAge;
@@ -790,10 +841,18 @@ function renderGroups() {
         const temperature = normalizedTrustScore(group.hostTrustScore);
         const temperatureBadge = createText('span', `🌡 개설자 함께하기 신뢰도 ${temperature.toFixed(1)}°C`, `temperature-badge ${trustScoreClass(temperature)}`);
         temperatureBadge.title = '시간 약속·배려와 매너·규칙 준수에 기반한 공개 지표입니다. 인기나 외모를 평가하지 않습니다.';
+        const contextBadges = document.createElement('div');
+        contextBadges.className = 'activity-context-badges';
+        contextBadges.append(
+            createText('span', `💬 ${conversationLevelLabel(group.conversationLevel)}`, 'context-badge'),
+            createText('span', group.beginnerFriendly ? '🌱 초보 참여 가능' : '경험자 중심', 'context-badge'),
+            createText('span', `⏱ ${formatDuration(group.durationMinutes)}`, 'context-badge')
+        );
         card.append(
             ageBadge,
             createText('span', `${activityFamilyLabel(group.categoryFamily)} · ${group.category}`, 'category-badge'),
             temperatureBadge,
+            contextBadges,
             createText('h3', group.title, 'card-title'),
             createText('p', group.purpose, 'card-purpose'),
             createText('p', group.description),
@@ -808,13 +867,19 @@ function renderGroups() {
         join.type = 'button'; join.className = 'btn-outline';
         join.textContent = state.joinedGroupIds.has(group.id) ? '참여 취소' : '참여 신청하기';
         join.addEventListener('click', () => toggleParticipation(group.id));
+        const room = document.createElement('button');
+        room.type = 'button'; room.className = 'btn-text'; room.textContent = '공지방';
+        room.disabled = !state.joinedGroupIds.has(group.id);
+        room.title = room.disabled ? '참여 후 열 수 있어요.' : '활동 공지·채팅방 열기';
+        room.addEventListener('click', () => openActivityRoom(group.id));
         const report = document.createElement('button');
         report.type = 'button'; report.className = 'btn-text'; report.textContent = '신고';
         report.addEventListener('click', () => reportActivity(group.id));
-        actions.append(status, join, report);
+        actions.append(status, join, room, report);
         card.append(actions);
         elements.list.append(card);
     });
+    renderHistory();
 }
 
 function renderBoard() {
@@ -828,6 +893,187 @@ function renderBoard() {
         card.className = 'board-card';
         card.append(createText('span', post.category, 'category-badge'), createText('h3', post.title), createText('p', post.body), createText('span', `${post.author} · ${formatDate(post.createdAt)}`, 'card-meta'));
         elements.boardList.append(card);
+    });
+}
+
+function isActivityCompleted(group) {
+    return group.status === 'completed' || new Date(group.scheduledAt).getTime() <= Date.now();
+}
+
+function getConnectionCheckins() {
+    const checkins = safeJson(localStorage.getItem(CONNECTION_CHECKINS_KEY), []);
+    return Array.isArray(checkins) ? checkins : [];
+}
+
+function getParticipationLog() {
+    const log = safeJson(localStorage.getItem(PARTICIPATION_LOG_KEY), []);
+    return Array.isArray(log) ? log : [];
+}
+
+function getActivityChats() {
+    const chats = safeJson(localStorage.getItem(ACTIVITY_CHAT_KEY), {});
+    return chats && typeof chats === 'object' && !Array.isArray(chats) ? chats : {};
+}
+
+function saveActivityChats(chats) {
+    localStorage.setItem(ACTIVITY_CHAT_KEY, JSON.stringify(chats));
+}
+
+function renderActivityRoomChat(groupId) {
+    const chats = getActivityChats();
+    if (!Array.isArray(chats[groupId]) || !chats[groupId].length) {
+        chats[groupId] = [{ id: `room-welcome:${groupId}`, kind: 'system', nickname: '운영팀', body: '활동 공지·채팅방이 열렸어요. 장소와 시간을 확인하고, 필요한 이야기만 남겨 주세요.', createdAt: new Date().toISOString() }];
+        saveActivityChats(chats);
+    }
+    elements.roomChatMessages.replaceChildren();
+    chats[groupId].slice(-50).forEach((message) => {
+        const item = document.createElement('article');
+        item.className = `room-chat-message${message.userId === state.user?.id ? ' mine' : ''}`;
+        item.append(createText('strong', message.nickname || '무프로필'), createText('p', message.body), createText('time', formatDate(message.createdAt)));
+        elements.roomChatMessages.append(item);
+    });
+    elements.roomChatMessages.scrollTop = elements.roomChatMessages.scrollHeight;
+}
+
+function submitActivityRoomChat(event) {
+    event.preventDefault();
+    const groupId = elements.activityRoomModal.dataset.groupId;
+    const group = state.groups.find((item) => item.id === groupId);
+    const body = elements.roomChatInput.value.trim();
+    if (!state.user || !group || !state.joinedGroupIds.has(groupId)) return setInlineStatus(elements.roomChatStatus, '참여한 활동에서만 채팅할 수 있어요.', 'warning');
+    if (!body) return setInlineStatus(elements.roomChatStatus, '메시지를 입력해 주세요.', 'warning');
+    const chats = getActivityChats();
+    if (!Array.isArray(chats[groupId])) chats[groupId] = [];
+    chats[groupId].push({ id: `chat:${Date.now()}`, kind: 'user', userId: state.user.id, nickname: state.user.nickname, body: body.slice(0, 240), createdAt: new Date().toISOString() });
+    saveActivityChats(chats);
+    renderActivityRoomChat(groupId);
+    elements.roomChatInput.value = '';
+    setInlineStatus(elements.roomChatStatus, '닉네임으로 메시지를 남겼어요.', 'success');
+}
+
+function recordParticipationEvent(group, action) {
+    if (!state.user || !group) return;
+    const log = getParticipationLog();
+    log.push({ groupId: group.id, userId: state.user.id, nickname: state.user.nickname, action, createdAt: new Date().toISOString() });
+    localStorage.setItem(PARTICIPATION_LOG_KEY, JSON.stringify(log.slice(-100)));
+}
+
+function openActivityRoom(groupId) {
+    if (!state.user) return setStatus('로그인 후 활동 공지방을 확인할 수 있습니다.', 'warning');
+    const group = state.groups.find((item) => item.id === groupId);
+    if (!group || !state.joinedGroupIds.has(groupId)) return setStatus('참여한 활동의 공지방만 확인할 수 있습니다.', 'warning');
+    ensureGroupMetadata(group);
+    elements.activityRoomModal.dataset.groupId = groupId;
+    elements.roomTitle.textContent = group.title;
+    elements.roomMeta.textContent = `${formatDate(group.scheduledAt)} · ${group.location} · ${group.participants}/${group.maxParticipants}명`;
+    elements.roomMessages.replaceChildren();
+    const notice = document.createElement('article');
+    notice.className = 'room-message room-notice';
+    notice.append(createText('strong', '운영 공지'), createText('p', `공개 장소에서 ${formatDuration(group.durationMinutes)} 동안 진행합니다. 불편하면 언제든 참여를 취소할 수 있어요.`));
+    elements.roomMessages.append(notice);
+    const userEvents = getParticipationLog().filter((item) => item.groupId === group.id && item.userId === state.user.id);
+    userEvents.forEach((event) => {
+        const label = { joined: '참여 신청이 완료되었습니다.', withdrawn: '참여를 취소했습니다.', completed: '참여 완료로 기록했습니다.', underfilled_adjust: '인원을 조정해 계속 모집하기로 했습니다.' }[event.action] || event.action;
+        const message = document.createElement('article');
+        message.className = 'room-message room-system';
+        message.append(createText('strong', '참여 기록'), createText('p', `${label} · ${formatDate(event.createdAt)}`));
+        elements.roomMessages.append(message);
+    });
+    if (group.participants < MIN_PARTICIPANTS) {
+        const wait = document.createElement('article');
+        wait.className = 'room-message room-warning';
+        wait.append(createText('strong', '인원 안내'), createText('p', `현재 ${group.participants}명 참여 상태예요. 최소 ${MIN_PARTICIPANTS}명이 모이지 않으면 일정이 조정되거나 취소될 수 있습니다.`));
+        elements.roomMessages.append(wait);
+    }
+    renderActivityRoomChat(groupId);
+    elements.roomChatStatus.textContent = '';
+    elements.roomChatStatus.dataset.tone = '';
+    elements.activityRoomModal.classList.remove('hidden');
+}
+
+function closeActivityRoom() {
+    elements.activityRoomModal.classList.add('hidden');
+    elements.roomMessages.replaceChildren();
+    elements.roomChatMessages.replaceChildren();
+    elements.roomChatInput.value = '';
+    elements.roomChatStatus.textContent = '';
+}
+
+function markActivityCompleted(groupId) {
+    if (!state.user) return setStatus('로그인 후 참여 완료를 기록할 수 있습니다.', 'warning');
+    const group = state.groups.find((item) => item.id === groupId);
+    if (!group || !state.joinedGroupIds.has(groupId)) return setStatus('참여한 활동만 완료로 기록할 수 있습니다.', 'warning');
+    if (group.status === 'cancelled') return setStatus('취소된 활동은 완료로 기록할 수 없습니다.', 'warning');
+    if (new Date(group.scheduledAt).getTime() > Date.now()) return setStatus(`활동 완료는 ${formatDate(group.scheduledAt)} 이후에 기록할 수 있어요.`, 'warning');
+    group.status = 'completed';
+    group.completedAt = new Date().toISOString();
+    recordParticipationEvent(group, 'completed');
+    persistence.update(group);
+    renderGroups();
+    renderHistory();
+    setStatus(`'${group.title}' 활동을 참여 완료로 기록했습니다. 이제 활동 후 평가를 남겨 보세요.`, 'success');
+}
+
+function renderHistory() {
+    if (!elements.historyList) return;
+    elements.historyList.replaceChildren();
+    const checkins = getConnectionCheckins();
+    const joined = state.user ? state.groups.filter((group) => state.joinedGroupIds.has(group.id)) : [];
+    const completed = joined.filter(isActivityCompleted);
+    const revisitCount = completed.filter((group) => checkins.some((item) => item.groupId === group.id && item.userId === state.user?.id && item.revisit === 'yes')).length;
+    if (elements.historyCount) elements.historyCount.textContent = `${joined.length}개 활동`;
+    if (elements.historyCompletedCount) elements.historyCompletedCount.textContent = String(completed.length);
+    if (elements.historyRevisitCount) elements.historyRevisitCount.textContent = String(revisitCount);
+    if (elements.historyTrustScore) elements.historyTrustScore.textContent = `${normalizedTrustScore(state.user?.trustScore)}°C`;
+    if (elements.historyEmpty) {
+        elements.historyEmpty.classList.toggle('hidden', joined.length > 0);
+        const emptyTitle = elements.historyEmpty.querySelector('strong');
+        const emptyDescription = elements.historyEmpty.querySelector('p');
+        if (!state.user) {
+            if (emptyTitle) emptyTitle.textContent = '로그인 후 나의 활동 기록을 확인할 수 있어요.';
+            if (emptyDescription) emptyDescription.textContent = '활동은 로그인 없이 둘러볼 수 있고, 참여 신청과 활동 후 평가는 로그인 후 이용할 수 있습니다.';
+        } else {
+            if (emptyTitle) emptyTitle.textContent = '활동에 참여하면 이곳에 기록이 남아요.';
+            if (emptyDescription) emptyDescription.textContent = '활동이 끝난 뒤 편안함과 다시 참여할 의향을 남기고, 원한다면 다른 참여자의 시간 약속·배려·규칙 준수도 평가할 수 있어요.';
+        }
+    }
+    joined.sort((a, b) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime()).forEach((group) => {
+        ensureGroupMetadata(group);
+        const completedActivity = isActivityCompleted(group);
+        const checkin = checkins.find((item) => item.groupId === group.id && item.userId === state.user.id);
+        const card = document.createElement('article');
+        card.className = 'history-card';
+        const header = document.createElement('div');
+        header.className = 'history-card-header';
+        header.append(createText('span', completedActivity ? '활동 완료' : '참여 예정', `history-status ${completedActivity ? 'history-status-complete' : 'history-status-upcoming'}`), createText('span', formatDate(group.scheduledAt), 'card-meta'));
+        card.append(header, createText('span', `${activityFamilyLabel(group.categoryFamily)} · ${group.category}`, 'category-badge'), createText('h3', group.title), createText('p', `${group.purpose} · ${conversationLevelLabel(group.conversationLevel)}`, 'card-purpose'), createText('span', `📍 ${group.location} · ${formatDuration(group.durationMinutes)}`, 'card-meta'));
+        if (checkin) card.append(createText('p', `내 기록: ${checkin.feelingLabel} · ${checkin.revisitLabel}`, 'history-checkin-note'));
+        const actions = document.createElement('div');
+        actions.className = 'card-actions';
+        const room = document.createElement('button');
+        room.type = 'button'; room.className = 'btn-outline btn-small'; room.textContent = '공지방 열기';
+        room.addEventListener('click', () => openActivityRoom(group.id));
+        actions.append(room);
+        if (completedActivity) {
+            const evaluate = document.createElement('button');
+            evaluate.type = 'button'; evaluate.className = 'btn-primary btn-small'; evaluate.textContent = checkin ? '기록 다시 보기' : '활동 후 평가하기';
+            evaluate.addEventListener('click', () => openFeedback(group.id));
+            actions.append(evaluate);
+        } else {
+            const complete = document.createElement('button');
+            complete.type = 'button'; complete.className = 'btn-outline btn-small'; complete.textContent = '참여 완료 기록';
+            complete.title = '활동이 끝난 뒤 눌러 주세요.';
+            complete.addEventListener('click', () => markActivityCompleted(group.id));
+            const view = document.createElement('button');
+            view.type = 'button'; view.className = 'btn-outline btn-small'; view.textContent = '활동 상세 보기';
+            view.addEventListener('click', () => {
+                setView('activities');
+                window.setTimeout(() => document.getElementById(`activity-${group.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 0);
+            });
+            actions.append(complete, view);
+        }
+        card.append(actions);
+        elements.historyList.append(card);
     });
 }
 
@@ -867,13 +1113,31 @@ function renderNotifications() {
         card.append(createText('h4', notification.title), createText('p', notification.message));
         const actions = document.createElement('div');
         actions.className = 'notification-actions';
-        const confirm = document.createElement('button');
-        confirm.type = 'button'; confirm.className = 'btn-primary btn-small'; confirm.textContent = '확인했어요';
-        confirm.addEventListener('click', () => dismissNotification(notification.id));
-        const cancel = document.createElement('button');
-        cancel.type = 'button'; cancel.className = 'btn-outline btn-small'; cancel.textContent = '참여 취소';
-        cancel.addEventListener('click', () => { if (state.joinedGroupIds.has(notification.groupId)) toggleParticipation(notification.groupId); dismissNotification(notification.id); });
-        actions.append(confirm, cancel);
+        if (notification.kind === 'underfilled') {
+            const adjust = document.createElement('button');
+            adjust.type = 'button'; adjust.className = 'btn-primary btn-small'; adjust.textContent = '인원 조정 후 계속';
+            adjust.addEventListener('click', () => resolveUnderfilledNotification(notification.id, 'adjust'));
+            const cancel = document.createElement('button');
+            cancel.type = 'button'; cancel.className = 'btn-outline btn-small'; cancel.textContent = '이번 활동 취소';
+            cancel.addEventListener('click', () => resolveUnderfilledNotification(notification.id, 'cancel'));
+            actions.append(adjust, cancel);
+        } else if (notification.kind === 'participation') {
+            const room = document.createElement('button');
+            room.type = 'button'; room.className = 'btn-primary btn-small'; room.textContent = '공지방 열기';
+            room.addEventListener('click', () => openActivityRoom(notification.groupId));
+            const confirm = document.createElement('button');
+            confirm.type = 'button'; confirm.className = 'btn-outline btn-small'; confirm.textContent = '확인했어요';
+            confirm.addEventListener('click', () => dismissNotification(notification.id));
+            actions.append(room, confirm);
+        } else {
+            const confirm = document.createElement('button');
+            confirm.type = 'button'; confirm.className = 'btn-primary btn-small'; confirm.textContent = '확인했어요';
+            confirm.addEventListener('click', () => dismissNotification(notification.id));
+            const cancel = document.createElement('button');
+            cancel.type = 'button'; cancel.className = 'btn-outline btn-small'; cancel.textContent = '참여 취소';
+            cancel.addEventListener('click', () => { if (state.joinedGroupIds.has(notification.groupId)) toggleParticipation(notification.groupId); dismissNotification(notification.id); });
+            actions.append(confirm, cancel);
+        }
         card.append(actions);
         elements.notificationList.append(card);
     });
@@ -894,6 +1158,56 @@ function openNotifications() {
 
 function closeNotifications() {
     elements.notificationModal.classList.add('hidden');
+}
+
+function queueParticipationNotification(group, action) {
+    if (!state.user || !group) return;
+    const joined = action === 'joined';
+    state.notifications.push({
+        id: `participation:${group.id}:${state.user.id}:${action}:${Date.now()}`,
+        kind: 'participation',
+        groupId: group.id,
+        title: joined ? '참여 신청이 완료되었어요' : '참여 취소가 완료되었어요',
+        message: joined ? `'${group.title}'에 참여했어요. 활동 기록과 공지방에서 일정을 확인할 수 있습니다.` : `'${group.title}' 참여를 취소했어요.`,
+        createdAt: new Date().toISOString()
+    });
+    saveNotifications();
+    renderNotifications();
+}
+
+function queueUnderfilledNotification(group) {
+    if (!state.user || !group || group.participants >= MIN_PARTICIPANTS) return;
+    const notificationId = `underfilled:${group.id}:${state.user.id}`;
+    if (state.notifications.some((item) => item.id === notificationId)) return;
+    state.notifications.push({
+        id: notificationId,
+        kind: 'underfilled',
+        groupId: group.id,
+        title: '참여 인원을 함께 확인해 주세요',
+        message: `'${group.title}'은 현재 ${group.participants}/${group.maxParticipants}명입니다. 이번 활동을 취소하거나, 모집 인원을 조정해 최소 ${MIN_PARTICIPANTS}명이 모일 때까지 계속 모집할 수 있어요.`,
+        createdAt: new Date().toISOString()
+    });
+    saveNotifications();
+    renderNotifications();
+}
+
+function resolveUnderfilledNotification(notificationId, decision) {
+    const notification = state.notifications.find((item) => item.id === notificationId);
+    const group = notification && state.groups.find((item) => item.id === notification.groupId);
+    if (!notification || !group) return dismissNotification(notificationId);
+    if (decision === 'adjust') {
+        group.maxParticipants = Math.max(MIN_PARTICIPANTS, Math.min(group.maxParticipants, Math.max(group.participants, MIN_PARTICIPANTS)));
+        group.underfilledDecision = 'adjust';
+        persistence.update(group);
+        recordParticipationEvent(group, 'underfilled_adjust');
+        dismissNotification(notificationId);
+        renderGroups();
+        setStatus(`'${group.title}'은 인원을 조정해 계속 모집합니다. 최소 ${MIN_PARTICIPANTS}명이 모이면 진행할 수 있어요.`, 'success');
+        return;
+    }
+    if (state.joinedGroupIds.has(group.id)) toggleParticipation(group.id);
+    dismissNotification(notificationId);
+    setStatus(`'${group.title}' 참여를 취소했습니다.`, 'info');
 }
 
 function queueGenderBalanceNotification(group) {
@@ -924,14 +1238,15 @@ function localRecommendationMatches({ interest, comfort, timeWindow }) {
     const matches = state.groups
         .filter((group) => group.status === 'recruiting')
         .map((group) => {
+            ensureGroupMetadata(group);
             const searchable = normalizeSafetyText(`${group.title} ${group.purpose} ${group.description}`);
             const interestHit = interestTerms.length === 0 ? 0.25 : interestTerms.some((term) => searchable.includes(term)) ? 0.55 : 0;
-            const comfortText = comfort === 'quiet' && /말없이|각자|조용/.test(searchable) ? 0.25 : comfort === 'light_conversation' && /대화|이야기/.test(searchable) ? 0.25 : comfort === 'active' && /산책|운동|걷기/.test(searchable) ? 0.25 : comfort === 'any' ? 0.1 : 0;
+            const comfortText = comfort === 'quiet' && group.conversationLevel === 'quiet' ? 0.25 : comfort === 'light_conversation' && group.conversationLevel === 'light_conversation' ? 0.25 : comfort === 'active' && group.conversationLevel === 'active' ? 0.25 : comfort === 'beginner' && group.beginnerFriendly ? 0.25 : comfort === 'any' ? 0.1 : 0;
             const daysAway = (new Date(group.scheduledAt).getTime() - now) / (24 * 60 * 60 * 1000);
             const timeHit = timeWindow === 'today' && daysAway <= 1.2 ? 0.15 : timeWindow === 'this_week' && daysAway <= 7 ? 0.15 : timeWindow === 'any' ? 0.1 : 0;
             const fit = Math.min(0.99, interestHit + comfortText + timeHit + 0.05);
             const reason = interestHit >= 0.5 ? `${interest} 관심과 목적이 맞고, ` : '모임 목적이 부담 없이 참여하기 좋고, ';
-            const comfortReason = comfort === 'quiet' ? '조용히 각자의 시간을 보낼 수 있어요.' : comfort === 'active' ? '함께 움직이는 활동이라 잘 맞아요.' : '참여 방식이 가벼워서 시작하기 좋아요.';
+            const comfortReason = comfort === 'quiet' ? '대화 부담이 낮은 방식이에요.' : comfort === 'active' ? '함께 이야기하고 움직이는 활동이에요.' : comfort === 'beginner' ? '처음 참여하는 분도 괜찮은 활동이에요.' : '내 속도에 맞춰 참여하기 좋아요.';
             return { activityId: group.id, fit, reason: `${reason}${comfortReason}` };
         })
         .filter((item) => item.fit >= 0.35)
@@ -959,7 +1274,7 @@ async function getRecommendations(preferences) {
     let matches = null;
     if (CONFIG.RECOMMENDATION_URL) {
         try {
-            const result = await requestAutomation('recommend', { preferences, activities: state.groups.filter((group) => group.status === 'recruiting').map(({ id, title, purpose, description, location, scheduledAt, participants, maxParticipants }) => ({ id, title, purpose, description, location, scheduledAt, participants, maxParticipants })) }, CONFIG.RECOMMENDATION_URL);
+            const result = await requestAutomation('recommend', { preferences, activities: state.groups.filter((group) => group.status === 'recruiting').map((group) => ({ id: group.id, title: group.title, purpose: group.purpose, description: group.description, location: group.location, scheduledAt: group.scheduledAt, participants: group.participants, maxParticipants: group.maxParticipants, category: group.category, conversationLevel: group.conversationLevel, beginnerFriendly: group.beginnerFriendly, durationMinutes: group.durationMinutes })) }, CONFIG.RECOMMENDATION_URL);
             if (Array.isArray(result?.recommendations)) matches = result.recommendations.map((item) => ({ activityId: item.activityId, fit: Number(item.fit) || 0, reason: String(item.reason || '') })).filter((item) => item.activityId && item.reason);
         } catch { matches = null; }
     }
@@ -1449,6 +1764,7 @@ async function handleCreate(event) {
         scheduledAt: parsedScheduledAt && Number.isFinite(parsedScheduledAt.getTime()) ? parsedScheduledAt.toISOString() : '',
         maxParticipants: Number($('input-limit').value), creatorId: state.user.id, hostTrustScore: state.user.trustScore,
         category: $('input-category').value, categoryFamily: activityFamilyForType($('input-category').value), ageGroup: $('input-age-group').value,
+        conversationLevel: $('input-conversation-level').value, beginnerFriendly: $('input-beginner-friendly').checked, durationMinutes: Number($('input-duration').value),
         participants: 1, participantIds: [state.user.id], status: 'pending'
     };
     ensureGroupMetadata(activity);
@@ -1501,11 +1817,16 @@ async function toggleParticipation(groupId) {
             group.participants = Number(result?.participant_count ?? group.participants + (joined ? -1 : 1));
             if (joined) {
                 state.joinedGroupIds.delete(groupId);
+                recordParticipationEvent(group, 'withdrawn');
+                queueParticipationNotification(group, 'withdrawn');
                 setStatus('Supabase에서 모임 참여를 취소했습니다.');
             } else {
                 state.joinedGroupIds.add(groupId);
+                recordParticipationEvent(group, 'joined');
+                queueParticipationNotification(group, 'joined');
                 setStatus(`'${group.title}' 모임에 참여했습니다.`, 'success');
                 queueGenderBalanceNotification(group);
+                queueUnderfilledNotification(group);
             }
             persistence.update(group); renderGroups();
         } catch (error) {
@@ -1520,13 +1841,19 @@ async function toggleParticipation(groupId) {
         group.participantIds = (group.participantIds || []).filter((id) => id !== state.user.id);
         if (viewerGender && privateState) privateState[viewerGender] = Math.max(0, Number(privateState[viewerGender] || 0) - 1);
         state.joinedGroupIds.delete(groupId);
+        recordParticipationEvent(group, 'withdrawn');
+        queueParticipationNotification(group, 'withdrawn');
         setStatus('모임 참여를 취소했습니다.');
     } else {
         if (group.participants >= group.maxParticipants) return setStatus('모집 인원이 가득 찼습니다.', 'warning');
         group.participants += 1; group.participantIds = [...(group.participantIds || []), state.user.id];
         if (viewerGender && privateState) privateState[viewerGender] = Number(privateState[viewerGender] || 0) + 1;
-        state.joinedGroupIds.add(groupId); setStatus(`'${group.title}' 모임에 참여했습니다.`, 'success');
+        state.joinedGroupIds.add(groupId);
+        recordParticipationEvent(group, 'joined');
+        queueParticipationNotification(group, 'joined');
+        setStatus(`'${group.title}' 모임에 참여했습니다.`, 'success');
         queueGenderBalanceNotification(group);
+        queueUnderfilledNotification(group);
     }
     persistence.update(group); renderGroups();
 }
@@ -1541,24 +1868,54 @@ function reportActivity(groupId) {
     setStatus('신고가 접수되었습니다. 운영자 검토 전까지 활동을 주의 깊게 확인합니다.', 'success');
 }
 
+function setFeedbackRating(field, rating) {
+    const input = $(`feedback-${field}`);
+    const picker = document.querySelector(`.star-picker[data-rating-field="${field}"]`);
+    if (!input || !picker) return;
+    input.value = String(rating);
+    picker.querySelectorAll('button[data-rating]').forEach((button) => {
+        button.classList.toggle('selected', Number(button.dataset.rating) <= Number(rating));
+        button.setAttribute('aria-checked', Number(button.dataset.rating) === Number(rating) ? 'true' : 'false');
+    });
+}
+
+function resetFeedbackRatings() {
+    ['punctuality', 'courtesy', 'rules'].forEach((field) => {
+        const input = $(`feedback-${field}`);
+        const picker = document.querySelector(`.star-picker[data-rating-field="${field}"]`);
+        if (input) input.value = '';
+        picker?.querySelectorAll('button[data-rating]').forEach((button) => {
+            button.classList.remove('selected');
+            button.setAttribute('aria-checked', 'false');
+        });
+    });
+}
+
 function openFeedback(groupId) {
     if (!state.user) return setStatus('로그인 후 평가할 수 있습니다.', 'warning');
     const group = state.groups.find((item) => item.id === groupId);
     const subject = $('feedback-subject');
     subject.replaceChildren();
+    subject.append(createText('option', '참여자 평가 없이 내 활동만 기록'));
+    subject.lastElementChild.value = '';
     (group?.participantIds || []).filter((id) => id !== state.user.id).forEach((id) => {
         subject.append(createText('option', id === state.user.id ? '나' : `참여자 ${id.slice(0, 6)}`));
         subject.lastElementChild.value = id;
     });
-    if (!subject.options.length) return setStatus('평가할 다른 참여자가 없습니다.', 'warning');
     elements.feedbackModal.dataset.groupId = groupId;
     elements.feedbackModal.classList.remove('hidden');
-    $('feedback-punctuality').focus();
+    const existingCheckin = getConnectionCheckins().find((item) => item.groupId === groupId && item.userId === state.user.id);
+    if (existingCheckin) {
+        $('feedback-feeling').value = existingCheckin.feeling;
+        $('feedback-revisit').value = existingCheckin.revisit;
+    }
+    $('feedback-feeling').focus();
 }
 
 function closeFeedback() {
     elements.feedbackModal.classList.add('hidden');
     elements.feedbackForm.reset();
+    resetFeedbackRatings();
     if (elements.feedbackSubmitStatus) { elements.feedbackSubmitStatus.textContent = ''; elements.feedbackSubmitStatus.dataset.tone = ''; }
 }
 
@@ -1567,17 +1924,38 @@ function submitFeedback(event) {
     const groupId = elements.feedbackModal.dataset.groupId;
     const reviews = safeJson(localStorage.getItem(REVIEWS_KEY), []);
     const subjectId = $('feedback-subject').value;
-    if (!subjectId || subjectId === state.user.id) return setFeedbackStatus('평가할 참여자를 선택해 주세요. 본인은 평가할 수 없습니다.', 'warning', 'feedback-subject');
-    if (reviews.some((review) => review.groupId === groupId && review.reviewerId === state.user.id && review.subjectId === subjectId)) return setFeedbackStatus('이 참여자에게는 이미 평가를 제출했습니다.', 'warning', 'feedback-subject');
+    const checkins = getConnectionCheckins();
+    const existingCheckinIndex = checkins.findIndex((item) => item.groupId === groupId && item.userId === state.user.id);
     const dimensions = ['punctuality', 'courtesy', 'rules'];
     const values = dimensions.map((dimension) => $(`feedback-${dimension}`).value);
-    reviews.push({ groupId, reviewerId: state.user.id, subjectId, dimensions: Object.fromEntries(dimensions.map((key, index) => [key, values[index]])), createdAt: new Date().toISOString() });
-    localStorage.setItem(REVIEWS_KEY, JSON.stringify(reviews));
-    const trust = safeJson(localStorage.getItem(TRUST_KEY), {});
-    const score = getTrustProjection(subjectId, TRUST_BASELINE);
-    trust[subjectId] = Math.max(0, Math.min(100, score + calculateTrustDelta(values)));
-    localStorage.setItem(TRUST_KEY, JSON.stringify(trust));
-    closeFeedback(); setStatus('행동 기반 평가가 제출되었습니다.', 'success');
+    let behaviorRecorded = false;
+    if (subjectId) {
+        if (subjectId === state.user.id) return setFeedbackStatus('본인은 평가할 수 없습니다. 참여자 평가 없이 내 활동만 기록해 주세요.', 'warning', 'feedback-subject');
+        if (values.some((value) => !Number.isInteger(Number(value)) || Number(value) < 1 || Number(value) > 5)) return setFeedbackStatus('참여자 평가를 하려면 세 가지 행동 별점을 모두 선택해 주세요.', 'warning');
+        if (reviews.some((review) => review.groupId === groupId && review.reviewerId === state.user.id && review.subjectId === subjectId)) return setFeedbackStatus('이 참여자에게는 이미 평가를 제출했습니다.', 'warning', 'feedback-subject');
+        reviews.push({ groupId, reviewerId: state.user.id, subjectId, dimensions: Object.fromEntries(dimensions.map((key, index) => [key, values[index]])), createdAt: new Date().toISOString() });
+        localStorage.setItem(REVIEWS_KEY, JSON.stringify(reviews));
+        const trust = safeJson(localStorage.getItem(TRUST_KEY), {});
+        const score = getTrustProjection(subjectId, TRUST_BASELINE);
+        trust[subjectId] = Math.max(0, Math.min(100, score + calculateTrustDelta(values)));
+        localStorage.setItem(TRUST_KEY, JSON.stringify(trust));
+        behaviorRecorded = true;
+    }
+    const feelingLabels = { comfortable: '편안하게 참여함', mixed: '조금 어색했지만 괜찮았음', slow: '다음에는 더 천천히 참여하고 싶음' };
+    const revisitLabels = { yes: '다시 참여하고 싶음', maybe: '관심은 있지만 잠시 쉬고 싶음', not_now: '당분간 쉬고 싶음' };
+    const nextCheckin = {
+        groupId,
+        userId: state.user.id,
+        feeling: $('feedback-feeling').value,
+        feelingLabel: feelingLabels[$('feedback-feeling').value],
+        revisit: $('feedback-revisit').value,
+        revisitLabel: revisitLabels[$('feedback-revisit').value],
+        createdAt: new Date().toISOString()
+    };
+    if (existingCheckinIndex >= 0) checkins[existingCheckinIndex] = nextCheckin;
+    else checkins.push(nextCheckin);
+    localStorage.setItem(CONNECTION_CHECKINS_KEY, JSON.stringify(checkins));
+    closeFeedback(); renderHistory(); setStatus(behaviorRecorded ? '활동 후 기록과 행동 기반 평가가 저장되었습니다.' : '활동 후 연결 기록이 저장되었습니다. 참여 온도에는 영향을 주지 않아요.', 'success');
 }
 
 function appendChatMessage(role, message) {
@@ -1627,11 +2005,11 @@ function cancelUnderfilledGroups() {
 
 function viewFromLocation() {
     const route = window.location.hash.replace(/^#\/?/, '');
-    return ['home', 'activities', 'recommendation', 'board', 'guide'].includes(route) ? route : 'home';
+    return ['home', 'activities', 'recommendation', 'board', 'history', 'guide'].includes(route) ? route : 'home';
 }
 
 function setView(view, shouldScroll = true, updateUrl = true) {
-    const allowedViews = ['home', 'activities', 'recommendation', 'board', 'guide'];
+    const allowedViews = ['home', 'activities', 'recommendation', 'board', 'history', 'guide'];
     const nextView = allowedViews.includes(view) ? view : 'home';
     if (updateUrl) {
         const nextRoute = nextView === 'home' ? '#/' : `#/${nextView}`;
@@ -1639,6 +2017,7 @@ function setView(view, shouldScroll = true, updateUrl = true) {
     }
     document.body.dataset.view = nextView;
     if (elements.recommendationDock) elements.recommendationDock.open = nextView === 'recommendation';
+    if (nextView === 'history') renderHistory();
     elements.viewTabs.forEach((tab) => {
         if (tab.classList.contains('nav-tab')) tab.classList.toggle('active', tab.dataset.viewTarget === nextView);
         if (tab.dataset.viewTarget) tab.setAttribute('aria-current', tab.dataset.viewTarget === nextView ? 'page' : 'false');
@@ -1695,6 +2074,7 @@ function handleStaticButtonClick(button, event) {
         'btn-open-chatbot': openChatbot,
         'btn-close-chatbot': closeChatbot,
         'btn-close-feedback': closeFeedback,
+        'btn-close-activity-room': closeActivityRoom,
         'btn-check-id': checkSignupId,
         'btn-send-verification': sendSignupVerification,
         'btn-complete-verification': completeSignupVerification
@@ -1721,12 +2101,13 @@ function init() {
     $('signup-verification-method').addEventListener('change', resetSignupVerification);
     elements.form.addEventListener('submit', handleCreate);
     elements.feedbackForm.addEventListener('submit', submitFeedback);
+    elements.roomChatForm.addEventListener('submit', submitActivityRoomChat);
     elements.recommendationForm.addEventListener('submit', handleRecommendation);
     elements.search.addEventListener('input', (event) => { state.filters.query = event.target.value; renderGroups(); renderBoard(); });
     elements.chatForm.addEventListener('submit', handleChatbot);
     window.addEventListener('hashchange', () => setView(viewFromLocation(), true, false));
     window.addEventListener('popstate', () => setView(viewFromLocation(), true, false));
-    window.addEventListener('storage', (event) => { if (event.key === GROUPS_KEY) { persistence.load(); renderGroups(); } if (event.key === NOTIFICATIONS_KEY) { loadNotifications(); renderNotifications(); } });
+    window.addEventListener('storage', (event) => { if (event.key === GROUPS_KEY) { persistence.load(); renderGroups(); } if (event.key === NOTIFICATIONS_KEY) { loadNotifications(); renderNotifications(); } if (event.key === ACTIVITY_CHAT_KEY && elements.activityRoomModal.dataset.groupId) renderActivityRoomChat(elements.activityRoomModal.dataset.groupId); });
     window.addEventListener('dg:groups-changed', renderGroups);
     window.setInterval(cancelUnderfilledGroups, 30_000);
     void hydrateSupabaseSession();
@@ -1735,6 +2116,12 @@ function init() {
 document.addEventListener('click', (event) => {
     const button = event.target.closest?.('button');
     if (button && handleStaticButtonClick(button, event)) return;
+    const star = event.target.closest?.('.star-picker button[data-rating]');
+    if (star) {
+        event.preventDefault();
+        setFeedbackRating(star.closest('.star-picker').dataset.ratingField, star.dataset.rating);
+        return;
+    }
     const target = event.target.closest?.('[data-view-target]');
     if (!target || target.id === 'nav-create') return;
     event.preventDefault();
