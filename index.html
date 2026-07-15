@@ -103,11 +103,10 @@
             <p id="empty-state" class="empty-state hidden">조건에 맞는 모집방이 없어요.</p>
         </section>
 
-        <section id="board" class="lower-grid section-block">
+        <section id="board-preview" class="lower-grid section-block">
             <div class="board-panel">
-                <div class="section-heading compact"><div><p class="eyebrow">OPTIONAL · COMMUNITY BOARD</p><h2>모임 전 참고 게시판</h2><p>활동 참여가 먼저이고, 게시판은 필요할 때 참고해 보세요.</p></div><span class="section-symbol">↗</span></div>
-                <div id="board-list" class="board-list"></div>
-                <p id="board-empty" class="empty-state hidden">검색 조건에 맞는 게시글이 없어요.</p>
+                <div class="section-heading compact"><div><p class="eyebrow">OPTIONAL · COMMUNITY BOARD</p><h2>모임 전 참고 게시판</h2><p>활동 참여 전에 필요한 정보와 경험을 참고해 보세요.</p></div><button class="section-symbol section-link-button" type="button" data-view-target="board" aria-label="모임 전 참고 게시판 전체 보기">↗</button></div>
+                <div id="board-preview-list" class="board-list"></div>
             </div>
             <div class="guide-panel">
                 <div class="section-heading compact"><div><p class="eyebrow">ACTIVITY GUIDE</p><h2>모임 예시</h2><p>원하는 활동이 없다면 직접 만들어보세요.</p></div></div>
@@ -116,6 +115,35 @@
                     <div id="category-list" class="category-list"></div>
                 </details>
                 <button class="btn-outline guide-create-button" type="button" id="btn-create-guide">내 활동 만들기 <span>→</span></button>
+            </div>
+        </section>
+
+        <section id="board" class="lower-grid section-block">
+            <div class="board-panel">
+                <div class="section-heading compact"><div><p class="eyebrow">OPTIONAL · COMMUNITY BOARD</p><h2>모임 전 참고 게시판</h2><p>활동 참여 전에 필요한 정보와 경험을 참고해 보세요.</p></div><button class="section-symbol section-link-button" type="button" data-view-target="board-detail" aria-label="모임 전 참고 게시판 상세 페이지 열기">↗</button></div>
+                <div id="board-section-list" class="board-list"></div>
+            </div>
+            <div class="guide-panel">
+                <div class="section-heading compact"><div><p class="eyebrow">ACTIVITY GUIDE</p><h2>모임 예시</h2><p>원하는 활동이 없다면 직접 만들어보세요.</p></div></div>
+                <details class="category-reference">
+                    <summary><strong>전체 활동 유형 보기</strong><span>＋</span></summary>
+                    <div id="board-category-list" class="category-list"></div>
+                </details>
+                <button class="btn-outline guide-create-button" type="button" id="btn-create-board-guide">내 활동 만들기 <span>→</span></button>
+            </div>
+        </section>
+
+        <section id="board-detail" class="board-page section-block">
+            <div class="board-panel">
+                <div class="section-heading compact"><div><p class="eyebrow">COMMUNITY BOARD</p><h2>모임 전 참고 게시판</h2><p>모임 참여 전에 필요한 정보와 경험을 찾아보세요.</p></div><button class="btn-outline" type="button" data-view-target="board">게시판으로 돌아가기</button></div>
+                <div class="board-toolbar">
+                    <label class="search-input-wrap" for="input-board-search"><span aria-hidden="true">⌕</span><input type="search" id="input-board-search" placeholder="게시글 검색" autocomplete="off"></label>
+                    <select id="board-category-filter" aria-label="게시판 카테고리 필터"><option value="all">전체 카테고리</option></select>
+                    <button class="btn-primary" type="button" id="btn-board-write">글쓰기</button>
+                </div>
+                <p id="board-status" class="form-submit-status" role="status" aria-live="polite"></p>
+                <div id="board-list" class="board-list"></div>
+                <p id="board-empty" class="empty-state hidden">검색 조건에 맞는 게시글이 없어요.</p>
             </div>
         </section>
 
@@ -152,6 +180,10 @@
     <div id="modal-create" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="create-title"><div class="modal glass-modal create-modal"><div class="modal-header"><div><p class="eyebrow">MAKE AN ACTIVITY</p><h3 id="create-title">새로운 모임 만들기</h3></div><button class="btn-close" id="btn-close-create" type="button" aria-label="닫기">×</button></div><div class="modal-body"><p class="signup-notice">공개된 장소에서 진행되는 3~6명 활동만 만들 수 있어요.</p><form id="form-create-group" novalidate><div class="form-group"><label for="input-purpose">모임 목적</label><input type="text" id="input-purpose" placeholder="예: 퇴근 후 가벼운 산책과 대화" required></div><div class="signup-grid"><div class="form-group"><label for="input-category">활동 유형</label><select id="input-category" required><option value="">활동 유형을 선택해 주세요</option></select></div><div class="form-group"><label for="input-age-group">참여 연령대</label><select id="input-age-group" required><option value="all">전 연령 참여 가능</option><option value="20s">20대 중심</option><option value="30s">30대 중심</option><option value="40s">40대 중심</option><option value="50plus">50대 이상 중심</option></select></div></div><div class="form-group"><label for="input-title">모임 제목</label><input type="text" id="input-title" placeholder="예: 한강 공원 산책하실 분" maxlength="80" required></div><div class="form-group"><label for="input-desc">모임 설명</label><textarea id="input-desc" placeholder="모임의 활동 내용을 자세히 적어주세요." rows="4" maxlength="500" required></textarea></div><div class="form-group"><label for="input-location">공개된 장소</label><input type="text" id="input-location" placeholder="예: 스타벅스 망원점" required></div><div class="signup-grid"><div class="form-group"><label for="input-time">모임 일시</label><input type="datetime-local" id="input-time" required></div><div class="form-group"><label for="input-limit">모집 인원 (3~6명)</label><select id="input-limit" required><option value="3">3명</option><option value="4">4명</option><option value="5">5명</option><option value="6" selected>6명</option></select></div></div><div class="ai-feedback hidden" id="ai-feedback-box"><span class="ai-icon">✦</span><p id="ai-feedback-text"></p></div><button type="submit" class="btn-primary w-100" id="btn-submit-group">안전 검토 후 모임 등록</button></form></div></div></div>
 
     <div id="modal-feedback" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="feedback-title"><div class="modal glass-modal"><div class="modal-header"><div><p class="eyebrow">AFTER THE ACTIVITY</p><h3 id="feedback-title">행동 기반 평가</h3></div><button class="btn-close" id="btn-close-feedback" type="button" aria-label="닫기">×</button></div><div class="modal-body"><p class="login-copy">외모·스펙·연애 적합성이 아닌 행동만 평가해 주세요.</p><form id="form-feedback" novalidate><div class="form-group"><label for="feedback-subject">평가할 참여자</label><select id="feedback-subject" required></select></div><div class="form-group"><label for="feedback-punctuality">시간 약속</label><select id="feedback-punctuality" required><option value="positive">잘 지켰어요</option><option value="negative">지키지 않았어요</option></select></div><div class="form-group"><label for="feedback-courtesy">친절과 매너</label><select id="feedback-courtesy" required><option value="positive">친절했어요</option><option value="negative">개선이 필요해요</option></select></div><div class="form-group"><label for="feedback-rules">커뮤니티 규칙</label><select id="feedback-rules" required><option value="positive">잘 지켰어요</option><option value="negative">위반했어요</option></select></div><p id="feedback-submit-status" class="form-submit-status" role="status" aria-live="polite"></p><button class="btn-primary w-100" type="submit">평가 제출</button></form></div></div></div>
+
+    <div id="modal-board-detail" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="board-detail-title"><div class="modal glass-modal board-detail-modal"><div class="modal-header"><div><p class="eyebrow" id="board-detail-category">BOARD POST</p><h3 id="board-detail-title"></h3></div><button class="btn-close" id="btn-close-board-detail" type="button" aria-label="닫기">×</button></div><div class="modal-body"><p id="board-detail-meta" class="card-meta"></p><p id="board-detail-body" class="board-detail-body"></p><div class="board-detail-actions"><button class="btn-danger-outline" id="btn-report-board-post" type="button">게시글 신고</button></div></div></div></div>
+
+    <div id="modal-board-write" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="board-write-title"><div class="modal glass-modal"><div class="modal-header"><div><p class="eyebrow">COMMUNITY BOARD</p><h3 id="board-write-title">참고글 작성</h3></div><button class="btn-close" id="btn-close-board-write" type="button" aria-label="닫기">×</button></div><div class="modal-body"><p class="signup-notice">모임 참여에 도움이 되는 정보만 작성해 주세요. 광고·개인정보·만남을 유도하는 글은 게시할 수 없습니다.</p><form id="form-board-write" novalidate><div class="form-group"><label for="input-board-category">카테고리</label><select id="input-board-category" required></select></div><div class="form-group"><label for="input-board-title">제목</label><input type="text" id="input-board-title" maxlength="80" required></div><div class="form-group"><label for="input-board-body">내용</label><textarea id="input-board-body" rows="7" maxlength="1000" required></textarea></div><p id="board-write-status" class="form-submit-status" role="status" aria-live="polite"></p><button class="btn-primary w-100" type="submit">안전 확인 후 게시</button></form></div></div></div>
 
     <div id="modal-notifications" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="notifications-title"><div class="modal glass-modal notification-modal"><div class="modal-header"><div><p class="eyebrow">NOTIFICATIONS</p><h3 id="notifications-title">참여 전에 확인해 주세요</h3></div><button class="btn-close" id="btn-close-notifications" type="button" aria-label="닫기">×</button></div><div id="notification-list" class="modal-body notification-list"></div></div></div>
 

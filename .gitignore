@@ -13,3 +13,4 @@ credentials/
 secrets/
 .vercel
 .env*
+!.env.example

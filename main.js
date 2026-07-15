@@ -19,6 +19,7 @@ const POSTS_KEY = 'dg_board_posts_v1';
 const OPERATIONS_KEY = 'dg_operations_v1';
 const RECOMMENDATION_CACHE_KEY = 'dg_recommendation_cache_v1';
 const RECOMMENDATION_CACHE_STATS_KEY = 'dg_recommendation_cache_stats_v1';
+const BOARD_CATEGORIES = ['안전 안내', '처음 참여하기', '준비물·복장', '장소·시간 팁', '활동 정보', '질문'];
 
 const state = {
     user: null,
@@ -28,7 +29,8 @@ const state = {
     pendingSignupId: null,
     filters: { query: '', ageGroup: 'all', category: 'all' },
     notifications: [],
-    posts: []
+    posts: [],
+    boardFilters: { query: '', category: 'all' }
 };
 const privateGroupState = new Map();
 
@@ -105,8 +107,22 @@ elements.ageFilters = $('age-filter-buttons');
 elements.categoryFilters = $('category-filter-buttons');
 elements.groupCount = $('group-count');
 elements.boardList = $('board-list');
+elements.boardPreviewList = $('board-preview-list');
+elements.boardSectionList = $('board-section-list');
 elements.boardEmpty = $('board-empty');
+elements.boardStatus = $('board-status');
+elements.boardSearch = $('input-board-search');
+elements.boardCategoryFilter = $('board-category-filter');
+elements.boardWriteModal = $('modal-board-write');
+elements.boardWriteForm = $('form-board-write');
+elements.boardWriteStatus = $('board-write-status');
+elements.boardDetailModal = $('modal-board-detail');
+elements.boardDetailCategory = $('board-detail-category');
+elements.boardDetailTitle = $('board-detail-title');
+elements.boardDetailMeta = $('board-detail-meta');
+elements.boardDetailBody = $('board-detail-body');
 elements.categoryList = $('category-list');
+elements.boardCategoryList = $('board-category-list');
 elements.activityExamples = $('activity-examples');
 elements.signupSubmitStatus = $('signup-submit-status');
 elements.chatModal = $('modal-chatbot');
@@ -398,9 +414,9 @@ function seedGroups() {
 
 function seedPosts() {
     return [
-        { id: 'post-1', title: '처음 참여하는 분께 안내드려요', body: '공개 장소에서 만나고, 부담스러우면 언제든 참여를 취소할 수 있어요.', author: '운영팀', category: '안전 안내', createdAt: new Date().toISOString() },
-        { id: 'post-2', title: '이번 주 가볍게 읽을 책 추천받아요', body: '조용히 각자 읽고 마지막 10분만 감상을 나누는 모임을 준비하고 있어요.', author: '느긋한 독서러', category: '독서·스터디', createdAt: new Date(Date.now() - 36 * 60 * 60 * 1000).toISOString() },
-        { id: 'post-3', title: '동네 운동 모임은 어떤 게 좋을까요?', body: '러닝, 산책, 배드민턴처럼 처음 참여하기 쉬운 활동을 함께 찾아봐요.', author: '주말의 시작', category: '운동', createdAt: new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString() }
+        { id: 'post-1', title: '처음 참여하는 분께 안내드려요', body: '공개 장소에서 만나고, 부담스러우면 언제든 참여를 취소할 수 있어요.', author: '운영팀', category: '안전 안내', pinned: true, createdAt: new Date().toISOString() },
+        { id: 'post-2', title: '이번 주 가볍게 읽을 책 추천받아요', body: '조용히 각자 읽고 마지막 10분만 감상을 나누는 모임을 준비하고 있어요.', author: '느긋한 독서러', category: '활동 정보', createdAt: new Date(Date.now() - 36 * 60 * 60 * 1000).toISOString() },
+        { id: 'post-3', title: '동네 운동 모임은 어떤 게 좋을까요?', body: '러닝, 산책, 배드민턴처럼 처음 참여하기 쉬운 활동을 함께 찾아봐요.', author: '주말의 시작', category: '활동 정보', createdAt: new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString() }
     ];
 }
 
@@ -559,6 +575,13 @@ function loadPosts() {
     const stored = safeJson(localStorage.getItem(POSTS_KEY), null);
     state.posts = Array.isArray(stored) && stored.length ? stored : seedPosts();
     localStorage.setItem(POSTS_KEY, JSON.stringify(state.posts));
+}
+
+function savePosts() { localStorage.setItem(POSTS_KEY, JSON.stringify(state.posts)); }
+
+function setBoardStatus(message, tone = 'info') {
+    elements.boardStatus.textContent = message;
+    elements.boardStatus.dataset.tone = tone;
 }
 
 function loadNotifications() {
@@ -835,17 +858,89 @@ function renderGroups() {
 }
 
 function renderBoard() {
-    if (!elements.boardList) return;
-    const query = normalizeSafetyText(state.filters.query);
-    const posts = state.posts.filter((post) => !query || normalizeSafetyText(`${post.title} ${post.body} ${post.category}`).includes(query));
-    elements.boardList.replaceChildren();
-    elements.boardEmpty.classList.toggle('hidden', posts.length > 0);
-    posts.forEach((post) => {
-        const card = document.createElement('article');
+    if (!elements.boardList && !elements.boardPreviewList) return;
+    const query = normalizeSafetyText(state.boardFilters.query);
+    const sortPosts = (items) => [...items].sort((a, b) => Number(b.pinned) - Number(a.pinned) || new Date(b.createdAt) - new Date(a.createdAt));
+    const latestPosts = sortPosts(state.posts);
+    const posts = latestPosts.filter((post) => (!query || normalizeSafetyText(`${post.title} ${post.body} ${post.category}`).includes(query)) && (state.boardFilters.category === 'all' || post.category === state.boardFilters.category));
+    const renderCards = (container, visiblePosts) => {
+        if (!container) return;
+        container.replaceChildren();
+        visiblePosts.forEach((post) => {
+        const card = document.createElement('button');
+        card.type = 'button';
         card.className = 'board-card';
-        card.append(createText('span', post.category, 'category-badge'), createText('h3', post.title), createText('p', post.body), createText('span', `${post.author} · ${formatDate(post.createdAt)}`, 'card-meta'));
-        elements.boardList.append(card);
+        card.dataset.postId = post.id;
+        card.append(createText('span', post.pinned ? '공지' : post.category, 'category-badge'), createText('h3', post.title), createText('p', post.body), createText('span', `${post.author} · ${formatDate(post.createdAt)}`, 'card-meta'));
+            container.append(card);
+        });
+    };
+    renderCards(elements.boardPreviewList, latestPosts.slice(0, 3));
+    renderCards(elements.boardSectionList, latestPosts.slice(0, 3));
+    if (elements.boardList) {
+        elements.boardList.replaceChildren();
+        renderCards(elements.boardList, posts);
+        elements.boardEmpty.classList.toggle('hidden', posts.length > 0);
+    }
+}
+
+function renderBoardCategories() {
+    elements.boardCategoryFilter.replaceChildren(createText('option', '전체 카테고리'));
+    elements.boardCategoryFilter.firstElementChild.value = 'all';
+    const categoryOptions = $('input-board-category');
+    BOARD_CATEGORIES.forEach((category) => {
+        elements.boardCategoryFilter.append(createText('option', category));
+        categoryOptions?.append(createText('option', category));
     });
+    elements.boardCategoryFilter.value = state.boardFilters.category;
+}
+
+function openBoardDetail(postId) {
+    const post = state.posts.find((item) => item.id === postId);
+    if (!post) return;
+    elements.boardDetailModal.dataset.postId = post.id;
+    elements.boardDetailCategory.textContent = post.pinned ? 'NOTICE · COMMUNITY BOARD' : post.category;
+    elements.boardDetailTitle.textContent = post.title;
+    elements.boardDetailMeta.textContent = `${post.author} · ${formatDate(post.createdAt)}`;
+    elements.boardDetailBody.textContent = post.body;
+    elements.boardDetailModal.classList.remove('hidden');
+}
+
+function closeBoardDetail() { elements.boardDetailModal.classList.add('hidden'); }
+
+function openBoardWrite() {
+    if (!state.user) return setBoardStatus('게시글 작성은 로그인 후 이용할 수 있어요. 먼저 로그인해 주세요.', 'warning');
+    elements.boardWriteForm.reset();
+    elements.boardWriteStatus.textContent = '';
+    elements.boardWriteStatus.dataset.tone = '';
+    elements.boardWriteModal.classList.remove('hidden');
+    $('input-board-category').focus();
+}
+
+function closeBoardWrite() { elements.boardWriteModal.classList.add('hidden'); elements.boardWriteForm.reset(); }
+
+async function submitBoardPost(event) {
+    event.preventDefault();
+    if (!state.user) return setInlineStatus(elements.boardWriteStatus, '로그인 후 게시글을 작성할 수 있어요.', 'warning');
+    const category = $('input-board-category').value;
+    const title = $('input-board-title').value.trim();
+    const body = $('input-board-body').value.trim();
+    if (!category || !title || !body) return setInlineStatus(elements.boardWriteStatus, '카테고리, 제목, 내용을 모두 입력해 주세요.', 'warning');
+    const verdict = mockSafetyReview({ title, purpose: '모임 전 참고 게시글', description: body, location: '게시판' });
+    if (verdict.decision !== 'approved') return setInlineStatus(elements.boardWriteStatus, `게시할 수 없는 내용이에요. ${verdict.guidance}`, 'warning');
+    state.posts.push({ id: `post-${Date.now()}`, title: title.slice(0, 80), body: body.slice(0, 1000), author: state.user.nickname, category, pinned: false, createdAt: new Date().toISOString() });
+    savePosts(); renderBoard(); closeBoardWrite(); setBoardStatus('참고글이 게시되었습니다.', 'success');
+}
+
+function reportBoardPost(postId) {
+    if (!state.user) return setBoardStatus('게시글 신고는 로그인 후 이용할 수 있어요.', 'warning');
+    const reason = window.prompt('신고 사유를 간단히 입력해 주세요.');
+    if (!reason || !reason.trim()) return setBoardStatus('신고 사유가 입력되지 않아 신고를 취소했습니다.', 'info');
+    const reports = safeJson(localStorage.getItem(REPORTS_KEY), []);
+    if (reports.some((report) => report.postId === postId && report.reporterId === state.user.id)) return setBoardStatus('이 게시글은 이미 신고했습니다.', 'warning');
+    reports.push({ id: `post-report-${Date.now()}`, postId, reporterId: state.user.id, reason: reason.trim().slice(0, 300), createdAt: new Date().toISOString() });
+    localStorage.setItem(REPORTS_KEY, JSON.stringify(reports));
+    closeBoardDetail(); setBoardStatus('게시글 신고가 접수되었습니다. 운영자가 확인할게요.', 'success');
 }
 
 function renderCategoryOptions() {
@@ -854,6 +949,10 @@ function renderCategoryOptions() {
     if (elements.categoryList) {
         elements.categoryList.replaceChildren();
         ACTIVITY_TYPES.forEach((type) => elements.categoryList.append(createText('span', type, 'category-chip')));
+    }
+    if (elements.boardCategoryList) {
+        elements.boardCategoryList.replaceChildren();
+        ACTIVITY_TYPES.forEach((type) => elements.boardCategoryList.append(createText('span', type, 'category-chip')));
     }
     if (elements.activityExamples) {
         elements.activityExamples.replaceChildren();
@@ -1725,11 +1824,11 @@ function cancelUnderfilledGroups() {
 
 function viewFromLocation() {
     const route = window.location.hash.replace(/^#\/?/, '');
-    return ['home', 'activities', 'recommendation', 'board', 'guide'].includes(route) ? route : 'home';
+    return ['home', 'activities', 'recommendation', 'board', 'board-detail', 'guide'].includes(route) ? route : 'home';
 }
 
 function setView(view, shouldScroll = true, updateUrl = true) {
-    const allowedViews = ['home', 'activities', 'recommendation', 'board', 'guide'];
+    const allowedViews = ['home', 'activities', 'recommendation', 'board', 'board-detail', 'guide'];
     const nextView = allowedViews.includes(view) ? view : 'home';
     if (updateUrl) {
         const nextRoute = nextView === 'home' ? '#/' : `#/${nextView}`;
@@ -1783,6 +1882,7 @@ function handleStaticButtonClick(button, event) {
         'nav-create': openCreate,
         'btn-create-main': openCreate,
         'btn-create-guide': openCreate,
+        'btn-create-board-guide': openCreate,
         'btn-profile': openProfile,
         'btn-close-profile': closeProfile,
         'btn-logout': logout,
@@ -1793,6 +1893,10 @@ function handleStaticButtonClick(button, event) {
         'btn-open-chatbot': openChatbot,
         'btn-close-chatbot': closeChatbot,
         'btn-close-feedback': closeFeedback,
+        'btn-board-write': openBoardWrite,
+        'btn-close-board-write': closeBoardWrite,
+        'btn-close-board-detail': closeBoardDetail,
+        'btn-report-board-post': () => reportBoardPost(elements.boardDetailModal.dataset.postId),
         'btn-check-id': checkSignupId,
         'btn-send-verification': sendSignupVerification,
         'btn-complete-verification': completeSignupVerification,
@@ -1815,7 +1919,7 @@ function init() {
         localStorage.setItem(USER_KEY, JSON.stringify(state.user));
     }
     if (state.user && getPrivateProfile()?.userId === state.user.id) state.filters.ageGroup = 'mine';
-    persistence.load(); loadPosts(); loadNotifications(); renderCategoryOptions(); migrateCurrentUserAccount(state.user); updateNav(); renderGroups(); renderBoard(); cancelUnderfilledGroups(); setView(viewFromLocation(), false, false);
+    persistence.load(); loadPosts(); loadNotifications(); renderCategoryOptions(); renderBoardCategories(); migrateCurrentUserAccount(state.user); updateNav(); renderGroups(); renderBoard(); cancelUnderfilledGroups(); setView(viewFromLocation(), false, false);
     elements.profileForm.addEventListener('submit', submitProfile);
     $('signup-id').addEventListener('input', () => { signupState.idAvailable = false; signupState.idCheckedId = ''; $('signup-id').dataset.checkedId = ''; $('signup-id').dataset.idAvailable = 'false'; $('signup-id-status').textContent = '아이디가 변경되었습니다. 다시 중복 확인해 주세요.'; $('signup-id-status').dataset.tone = 'info'; });
     $('signup-password').addEventListener('input', validateSignupPassword);
@@ -1827,6 +1931,9 @@ function init() {
     elements.feedbackForm.addEventListener('submit', submitFeedback);
     elements.recommendationForm.addEventListener('submit', handleRecommendation);
     elements.search.addEventListener('input', (event) => { state.filters.query = event.target.value; renderGroups(); renderBoard(); });
+    elements.boardSearch.addEventListener('input', (event) => { state.boardFilters.query = event.target.value; renderBoard(); });
+    elements.boardCategoryFilter.addEventListener('change', (event) => { state.boardFilters.category = event.target.value; renderBoard(); });
+    elements.boardWriteForm.addEventListener('submit', submitBoardPost);
     elements.chatForm.addEventListener('submit', handleChatbot);
     window.addEventListener('hashchange', () => setView(viewFromLocation(), true, false));
     window.addEventListener('popstate', () => setView(viewFromLocation(), true, false));
@@ -1839,6 +1946,8 @@ function init() {
 document.addEventListener('click', (event) => {
     const button = event.target.closest?.('button');
     if (button && handleStaticButtonClick(button, event)) return;
+    const boardCard = event.target.closest?.('.board-card[data-post-id]');
+    if (boardCard) { event.preventDefault(); openBoardDetail(boardCard.dataset.postId); return; }
     const target = event.target.closest?.('[data-view-target]');
     if (!target || target.id === 'nav-create') return;
     event.preventDefault();
