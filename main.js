@@ -607,6 +607,14 @@ function calculateTrustDelta(values) {
 function seedGroups() {
     const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
     const dayAfter = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+    const inThreeDays = new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString();
+    const inFourDays = new Date(Date.now() + 96 * 60 * 60 * 1000).toISOString();
+    const inFiveDays = new Date(Date.now() + 120 * 60 * 60 * 1000).toISOString();
+    const inSixDays = new Date(Date.now() + 144 * 60 * 60 * 1000).toISOString();
+    const inSevenDays = new Date(Date.now() + 168 * 60 * 60 * 1000).toISOString();
+    const inEightDays = new Date(Date.now() + 192 * 60 * 60 * 1000).toISOString();
+    const inNineDays = new Date(Date.now() + 216 * 60 * 60 * 1000).toISOString();
+    const inTenDays = new Date(Date.now() + 240 * 60 * 60 * 1000).toISOString();
     return [
         {
             id: 'seed-walk', title: '망원 한강공원 가볍게 산책하실 분',
@@ -652,9 +660,177 @@ function seedGroups() {
             id: 'seed-history', title: '50대 이상과 함께하는 역사 유적 답사',
             purpose: '천천히 걸으며 지역의 역사와 이야기를 나누기',
             description: '무리하지 않는 동선으로 박물관과 유적을 함께 둘러봅니다.',
-            location: '서대문형무소역사관 정문', scheduledAt: new Date(Date.now() + 144 * 60 * 60 * 1000).toISOString(),
+            location: '서대문형무소역사관 정문', scheduledAt: inSixDays,
             status: 'recruiting', participants: 4, maxParticipants: 6, ageGroup: '50plus', category: '역사 탐방 및 세미나', hostTrustScore: 45,
             participantIds: [], privateGenderCounts: { male: 3, female: 1 }
+        },
+        {
+            id: 'seed-writing', title: '일요일 아침 조용한 글쓰기',
+            purpose: '각자 쓰고 싶은 문장을 가져와 천천히 시작하기',
+            description: '말을 많이 하지 않아도 괜찮은 50분 글쓰기 시간입니다.',
+            location: '연남동 작은 도서관', scheduledAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+            status: 'recruiting', participants: 1, maxParticipants: 5, ageGroup: 'all', category: '글쓰기 모임', hostTrustScore: 52,
+            participantIds: [], privateGenderCounts: { male: 1, female: 0 }
+        },
+        {
+            id: 'seed-photo', title: '휴대폰 사진으로 동네 기록하기',
+            purpose: '잘 찍는 법보다 오늘 본 장면을 함께 남기기',
+            description: '사진 한 장만 가져와도 참여할 수 있는 느린 산책입니다.',
+            location: '망원시장 입구', scheduledAt: new Date(Date.now() + 30 * 60 * 60 * 1000).toISOString(),
+            status: 'recruiting', participants: 2, maxParticipants: 5, ageGroup: 'all', category: '사진 산책', hostTrustScore: 64,
+            participantIds: [], privateGenderCounts: { male: 1, female: 1 }
+        },
+        {
+            id: 'seed-drawing', title: '카페에서 30분 드로잉',
+            purpose: '서로의 그림을 평가하지 않고 각자 그려보기',
+            description: '준비물이 없어도 괜찮도록 간단한 도구를 함께 준비해요.',
+            location: '합정 조용한 카페', scheduledAt: new Date(Date.now() + 54 * 60 * 60 * 1000).toISOString(),
+            status: 'recruiting', participants: 1, maxParticipants: 4, ageGroup: 'all', category: '그림 그리기', hostTrustScore: 47,
+            participantIds: [], privateGenderCounts: { male: 0, female: 1 }
+        },
+        {
+            id: 'seed-music', title: '퇴근 후 이어폰 음악 나누기',
+            purpose: '좋아하는 곡 하나씩만 소개하며 가볍게 듣기',
+            description: '말보다 음악이 편한 날에도 함께 있을 수 있는 모임입니다.',
+            location: '상수 음악감상실', scheduledAt: inThreeDays,
+            status: 'recruiting', participants: 2, maxParticipants: 5, ageGroup: 'all', category: '악기·음악 모임', hostTrustScore: 71,
+            participantIds: [], privateGenderCounts: { male: 1, female: 1 }
+        },
+        {
+            id: 'seed-yoga', title: '초보자를 위한 저녁 요가',
+            purpose: '몸을 천천히 풀며 하루의 긴장을 덜어내기',
+            description: '동작을 따라가기 어려워도 쉬어갈 수 있는 초보 수업입니다.',
+            location: '연희동 주민센터 체육실', scheduledAt: inFourDays,
+            status: 'recruiting', participants: 2, maxParticipants: 6, ageGroup: 'all', category: '요가 모임', hostTrustScore: 58,
+            participantIds: [], privateGenderCounts: { male: 1, female: 1 }
+        },
+        {
+            id: 'seed-cafe', title: '말없이 앉아도 좋은 카페 한 시간',
+            purpose: '각자 시간을 보내다 원하면 짧게 안부 나누기',
+            description: '처음 만난 사이에도 침묵이 어색하지 않은 자리를 만들어요.',
+            location: '공덕역 북카페', scheduledAt: inFiveDays,
+            status: 'recruiting', participants: 2, maxParticipants: 5, ageGroup: 'all', category: '카페 모임', hostTrustScore: 43,
+            participantIds: [], privateGenderCounts: { male: 1, female: 1 }
+        },
+        {
+            id: 'seed-brunch', title: '주말 브런치와 느린 안부',
+            purpose: '식사 속도에 맞춰 부담 없이 대화하기',
+            description: '대화에 참여하지 않아도 괜찮은 작은 테이블입니다.',
+            location: '망원동 브런치 식당', scheduledAt: inSevenDays,
+            status: 'recruiting', participants: 3, maxParticipants: 6, ageGroup: '20~30대', category: '브런치 모임', hostTrustScore: 76,
+            participantIds: [], privateGenderCounts: { male: 2, female: 1 }
+        },
+        {
+            id: 'seed-steam', title: '처음 만난 사람과 스팀 협동게임',
+            purpose: '실수해도 웃고 다시 해보는 협동 플레이',
+            description: '게임을 잘하지 않아도 천천히 규칙을 익혀요.',
+            location: '홍대 보드게임 라운지', scheduledAt: inFiveDays,
+            status: 'recruiting', participants: 2, maxParticipants: 6, ageGroup: 'all', category: '스팀 협동게임', hostTrustScore: 62,
+            participantIds: [], privateGenderCounts: { male: 1, female: 1 }
+        },
+        {
+            id: 'seed-nintendo', title: '닌텐도 스위치 가볍게 한 판',
+            purpose: '승패보다 서로의 속도에 맞춰 즐기기',
+            description: '컨트롤러를 처음 잡는 분도 함께 시작할 수 있어요.',
+            location: '신촌 게임카페', scheduledAt: inEightDays,
+            status: 'recruiting', participants: 1, maxParticipants: 4, ageGroup: 'all', category: '닌텐도 모임', hostTrustScore: 54,
+            participantIds: [], privateGenderCounts: { male: 1, female: 0 }
+        },
+        {
+            id: 'seed-mystery', title: '초보자를 위한 추리 게임 모임',
+            purpose: '단서를 함께 살피고 천천히 결말을 찾아가기',
+            description: '말할 차례를 기다려주는 편안한 추리 게임입니다.',
+            location: '이태원 추리카페', scheduledAt: inTenDays,
+            status: 'recruiting', participants: 3, maxParticipants: 6, ageGroup: '30s', category: '추리 게임 모임', hostTrustScore: 69,
+            participantIds: [], privateGenderCounts: { male: 2, female: 1 }
+        },
+        {
+            id: 'seed-exhibition', title: '전시를 보고 한 줄 감상만 나누기',
+            purpose: '각자 천천히 관람하고 원하면 한 문장 남기기',
+            description: '감상을 길게 설명하지 않아도 서로의 시선을 존중해요.',
+            location: '서울시립미술관 서소문관', scheduledAt: inFourDays,
+            status: 'recruiting', participants: 2, maxParticipants: 5, ageGroup: 'all', category: '전시회 관람', hostTrustScore: 49,
+            participantIds: [], privateGenderCounts: { male: 1, female: 1 }
+        },
+        {
+            id: 'seed-theater', title: '동네 극장 함께 가기',
+            purpose: '공연 전후로 각자의 방식으로 시간을 보내기',
+            description: '공연이 끝난 뒤 바로 헤어져도 자연스러운 관람 모임입니다.',
+            location: '대학로 소극장 앞', scheduledAt: inNineDays,
+            status: 'recruiting', participants: 1, maxParticipants: 4, ageGroup: '20s', category: '연극 관람', hostTrustScore: 74,
+            participantIds: [], privateGenderCounts: { male: 0, female: 1 }
+        },
+        {
+            id: 'seed-plogging', title: '아침 40분 동네 플로깅',
+            purpose: '가볍게 걸으며 집 근처를 함께 돌보기',
+            description: '봉투와 집게는 준비되어 있어 빈손으로 와도 괜찮아요.',
+            location: '불광천 산책로 입구', scheduledAt: inThreeDays,
+            status: 'recruiting', participants: 2, maxParticipants: 6, ageGroup: 'all', category: '플로깅 모임', hostTrustScore: 63,
+            participantIds: [], privateGenderCounts: { male: 1, female: 1 }
+        },
+        {
+            id: 'seed-animal', title: '유기동물 보호소 물품 정리',
+            purpose: '두 시간 동안 필요한 일을 조용히 나눠 하기',
+            description: '동물을 직접 만지지 않아도 참여할 수 있는 봉사입니다.',
+            location: '마포구 유기동물 보호소', scheduledAt: inSixDays,
+            status: 'recruiting', participants: 3, maxParticipants: 6, ageGroup: 'all', category: '유기동물 봉사', hostTrustScore: 78,
+            participantIds: [], privateGenderCounts: { male: 2, female: 1 }
+        },
+        {
+            id: 'seed-environment', title: '하천 주변 환경정화 산책',
+            purpose: '걷는 김에 작은 쓰레기를 함께 줍기',
+            description: '대화보다 활동에 집중해도 괜찮은 주말 봉사 모임입니다.',
+            location: '홍제천 자전거길', scheduledAt: inEightDays,
+            status: 'recruiting', participants: 1, maxParticipants: 5, ageGroup: '40s', category: '환경정화 활동', hostTrustScore: 56,
+            participantIds: [], privateGenderCounts: { male: 1, female: 0 }
+        },
+        {
+            id: 'seed-side-project', title: '작게 시작하는 사이드 프로젝트',
+            purpose: '아이디어를 한 장으로 정리하고 다음 행동 정하기',
+            description: '완성된 계획 없이 와도 서로의 첫 단계를 응원해요.',
+            location: '을지로 공유공간', scheduledAt: inFiveDays,
+            status: 'recruiting', participants: 2, maxParticipants: 5, ageGroup: 'all', category: '사이드 프로젝트', hostTrustScore: 67,
+            participantIds: [], privateGenderCounts: { male: 1, female: 1 }
+        },
+        {
+            id: 'seed-app', title: '생활 속 불편을 앱 아이디어로',
+            purpose: '각자 겪은 불편을 듣고 작은 해결책을 그려보기',
+            description: '개발 경험이 없어도 관찰한 문제를 가져오면 충분해요.',
+            location: '성수 메이커스 라운지', scheduledAt: inSevenDays,
+            status: 'recruiting', participants: 1, maxParticipants: 6, ageGroup: '20~30대', category: '앱 개발 프로젝트', hostTrustScore: 51,
+            participantIds: [], privateGenderCounts: { male: 1, female: 0 }
+        },
+        {
+            id: 'seed-content', title: '동네 이야기를 담는 콘텐츠 팀',
+            purpose: '사진·글·영상 중 편한 방식으로 한 편 만들기',
+            description: '역할을 작게 나눠 혼자보다 가벼운 시작을 도와요.',
+            location: '연남동 커뮤니티 스튜디오', scheduledAt: inNineDays,
+            status: 'recruiting', participants: 3, maxParticipants: 6, ageGroup: 'all', category: '영상 제작 팀', hostTrustScore: 72,
+            participantIds: [], privateGenderCounts: { male: 2, female: 1 }
+        },
+        {
+            id: 'seed-baking', title: '처음 해보는 작은 베이킹',
+            purpose: '반죽부터 포장까지 천천히 함께 해보기',
+            description: '모양이 달라도 괜찮은 소규모 원데이 클래스예요.',
+            location: '망원동 공유주방', scheduledAt: inFourDays,
+            status: 'recruiting', participants: 2, maxParticipants: 5, ageGroup: 'all', category: '베이킹 클래스', hostTrustScore: 59,
+            participantIds: [], privateGenderCounts: { male: 1, female: 1 }
+        },
+        {
+            id: 'seed-cooking', title: '한 가지 요리만 같이 만들기',
+            purpose: '각자 맡은 재료를 준비하며 천천히 친해지기',
+            description: '요리를 잘하지 않아도 역할을 나눠 함께 완성해요.',
+            location: '합정 공유주방', scheduledAt: inSevenDays,
+            status: 'recruiting', participants: 1, maxParticipants: 4, ageGroup: '30s', category: '요리 모임', hostTrustScore: 46,
+            participantIds: [], privateGenderCounts: { male: 0, female: 1 }
+        },
+        {
+            id: 'seed-pottery', title: '흙을 만지는 조용한 도예 체험',
+            purpose: '손을 움직이며 잠깐 일상에서 벗어나기',
+            description: '완성도가 아니라 만드는 과정에 집중하는 체험입니다.',
+            location: '연희동 도예공방', scheduledAt: inTenDays,
+            status: 'recruiting', participants: 2, maxParticipants: 5, ageGroup: 'all', category: '도예 체험', hostTrustScore: 65,
+            participantIds: [], privateGenderCounts: { male: 1, female: 1 }
         }
     ];
 }
@@ -690,24 +866,24 @@ const ACTIVITY_FAMILIES = [
 ];
 
 const ACTIVITY_EXAMPLES = [
-    { family: 'study', title: '한 페이지씩 읽는 저녁 독서', description: '말하지 않아도 괜찮고, 마지막에 한 줄만 나눠요.', temperature: 48 },
-    { family: 'study', title: '퇴근 후 40분 코딩 함께하기', description: '각자 할 일을 가져와 조용히 집중해요.', temperature: 56 },
-    { family: 'hobby', title: '동네 사진 한 컷 산책', description: '잘 찍지 않아도 괜찮은 느린 사진 산책이에요.', temperature: 52 },
-    { family: 'hobby', title: '뜨개질 손을 쉬지 않는 시간', description: '각자 만들며 필요할 때만 대화해요.', temperature: 60 },
-    { family: 'sports', title: '천천히 동네 한 바퀴', description: '속도보다 함께 걷는 시간을 소중히 여겨요.', temperature: 64 },
-    { family: 'sports', title: '자전거 길을 가볍게 익히기', description: '각자 페이스를 지키며 쉬어 가요.', temperature: 55 },
-    { family: 'social', title: '커피 한 잔, 가벼운 안부', description: '처음이라도 부담 없이 1시간만 만나요.', temperature: 54 },
-    { family: 'social', title: '동네 브런치 한 접시', description: '대화가 길어지지 않아도 괜찮은 느슨한 자리예요.', temperature: 49 },
-    { family: 'game', title: '협동 게임 한 판', description: '승패보다 같이 익히는 과정을 즐겨요.', temperature: 67 },
-    { family: 'game', title: '처음 하는 보드게임 배우기', description: '규칙을 천천히 설명하며 함께 시작해요.', temperature: 61 },
-    { family: 'culture', title: '전시 보고 각자 한 줄 감상', description: '감상을 길게 말하지 않아도 괜찮아요.', temperature: 58 },
-    { family: 'culture', title: '동네 극장 조용한 관람', description: '보고 난 뒤 원하면 짧은 감상만 나눠요.', temperature: 70 },
-    { family: 'community', title: '주말 공원 플로깅', description: '동네를 가볍게 돌며 작은 변화를 만들어요.', temperature: 72 },
-    { family: 'community', title: '보호소 물품 정리 돕기', description: '필요한 일을 나누며 무리 없이 참여해요.', temperature: 65 },
-    { family: 'project', title: '작은 앱 아이디어 노트', description: '완성보다 시작을 함께 응원하는 모임이에요.', temperature: 63 },
-    { family: 'project', title: '포트폴리오 한 페이지 다듬기', description: '각자 작업하고 막힐 때만 가볍게 물어봐요.', temperature: 57 },
-    { family: 'other', title: '도예 소품 한 가지 만들기', description: '처음 만져봐도 괜찮은 원데이 작업이에요.', temperature: 50 },
-    { family: 'other', title: '계절 꽃 한 송이 고르기', description: '가까운 동네에서 취향을 천천히 나눠요.', temperature: 46 }
+    { family: 'study', title: '한 페이지씩 읽는 저녁 독서', description: '말하지 않아도 괜찮고, 마지막에 한 줄만 나눠요.' },
+    { family: 'study', title: '퇴근 후 40분 코딩 함께하기', description: '각자 할 일을 가져와 조용히 집중해요.' },
+    { family: 'hobby', title: '동네 사진 한 컷 산책', description: '잘 찍지 않아도 괜찮은 느린 사진 산책이에요.' },
+    { family: 'hobby', title: '뜨개질 손을 쉬지 않는 시간', description: '각자 만들며 필요할 때만 대화해요.' },
+    { family: 'sports', title: '천천히 동네 한 바퀴', description: '속도보다 함께 걷는 시간을 소중히 여겨요.' },
+    { family: 'sports', title: '자전거 길을 가볍게 익히기', description: '각자 페이스를 지키며 쉬어 가요.' },
+    { family: 'social', title: '커피 한 잔, 가벼운 안부', description: '처음이라도 부담 없이 1시간만 만나요.' },
+    { family: 'social', title: '동네 브런치 한 접시', description: '대화가 길어지지 않아도 괜찮은 느슨한 자리예요.' },
+    { family: 'game', title: '협동 게임 한 판', description: '승패보다 같이 익히는 과정을 즐겨요.' },
+    { family: 'game', title: '처음 하는 보드게임 배우기', description: '규칙을 천천히 설명하며 함께 시작해요.' },
+    { family: 'culture', title: '전시 보고 각자 한 줄 감상', description: '감상을 길게 말하지 않아도 괜찮아요.' },
+    { family: 'culture', title: '동네 극장 조용한 관람', description: '보고 난 뒤 원하면 짧은 감상만 나눠요.' },
+    { family: 'community', title: '주말 공원 플로깅', description: '동네를 가볍게 돌며 작은 변화를 만들어요.' },
+    { family: 'community', title: '보호소 물품 정리 돕기', description: '필요한 일을 나누며 무리 없이 참여해요.' },
+    { family: 'project', title: '작은 앱 아이디어 노트', description: '완성보다 시작을 함께 응원하는 모임이에요.' },
+    { family: 'project', title: '포트폴리오 한 페이지 다듬기', description: '각자 작업하고 막힐 때만 가볍게 물어봐요.' },
+    { family: 'other', title: '도예 소품 한 가지 만들기', description: '처음 만져봐도 괜찮은 원데이 작업이에요.' },
+    { family: 'other', title: '계절 꽃 한 송이 고르기', description: '가까운 동네에서 취향을 천천히 나눠요.' }
 ];
 
 function activityFamilyForType(type) {
@@ -1272,11 +1448,15 @@ function openActivityRoom(groupId) {
     renderActivityRoomChat(groupId);
     elements.roomChatStatus.textContent = '';
     elements.roomChatStatus.dataset.tone = '';
+    elements.notificationModal.classList.add('hidden');
+    elements.notificationModal.setAttribute('aria-hidden', 'true');
     elements.activityRoomModal.classList.remove('hidden');
+    elements.activityRoomModal.setAttribute('aria-hidden', 'false');
 }
 
 function closeActivityRoom() {
     elements.activityRoomModal.classList.add('hidden');
+    elements.activityRoomModal.setAttribute('aria-hidden', 'true');
     elements.roomMessages.replaceChildren();
     elements.roomChatMessages.replaceChildren();
     elements.roomChatInput.value = '';
@@ -1373,8 +1553,7 @@ function renderCategoryOptions() {
             card.append(
                 createText('span', activityFamilyLabel(example.family), 'category-badge'),
                 createText('strong', example.title),
-                createText('p', example.description),
-                createText('small', `참여 온도 ${example.temperature}°C`, 'example-temperature')
+                createText('p', example.description)
             );
             card.addEventListener('click', () => {
                 state.filters.category = example.family;
@@ -1443,10 +1622,12 @@ function openNotifications() {
     if (!state.user) return openLogin();
     renderNotifications();
     elements.notificationModal.classList.remove('hidden');
+    elements.notificationModal.setAttribute('aria-hidden', 'false');
 }
 
 function closeNotifications() {
     elements.notificationModal.classList.add('hidden');
+    elements.notificationModal.setAttribute('aria-hidden', 'true');
 }
 
 function queueParticipationNotification(group, action) {
