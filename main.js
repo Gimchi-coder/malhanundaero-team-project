@@ -18,7 +18,6 @@ const PARTICIPATION_LOG_KEY = 'dg_participation_log_v1';
 const ACTIVITY_CHAT_KEY = 'dg_activity_chat_v1';
 const TRUST_KEY = 'dg_trust_projection_v1';
 const NOTIFICATIONS_KEY = 'dg_notifications_v1';
-const POSTS_KEY = 'dg_board_posts_v1';
 const OPERATIONS_KEY = 'dg_operations_v1';
 const RECOMMENDATION_CACHE_KEY = 'dg_recommendation_cache_v1';
 const RECOMMENDATION_CACHE_STATS_KEY = 'dg_recommendation_cache_stats_v1';
@@ -36,8 +35,7 @@ const state = {
     recommendations: [],
     pendingSignupId: null,
     filters: { query: '', ageGroup: 'all', category: 'all' },
-    notifications: [],
-    posts: []
+    notifications: []
 };
 const privateGroupState = new Map();
 
@@ -118,7 +116,6 @@ elements.search = $('input-group-search');
 elements.applySearch = $('btn-apply-search');
 elements.createMain = $('btn-create-main');
 elements.recommendationHero = $('btn-recommendation-hero');
-elements.createGuide = $('btn-create-guide');
 elements.ageFilters = $('age-filter-buttons');
 elements.categoryFilters = $('category-filter-buttons');
 elements.groupCount = $('group-count');
@@ -137,17 +134,8 @@ elements.roomChatMessages = $('room-chat-messages');
 elements.roomChatForm = $('form-room-chat');
 elements.roomChatInput = $('input-room-chat');
 elements.roomChatStatus = $('room-chat-status');
-elements.boardList = $('board-list');
-elements.boardEmpty = $('board-empty');
-elements.categoryList = $('category-list');
 elements.activityExamples = $('activity-examples');
 elements.signupSubmitStatus = $('signup-submit-status');
-elements.activitySettings = $('login-activity-settings');
-elements.activitySettingsForm = $('form-activity-settings');
-elements.activitySettingsDate = $('input-activity-date');
-elements.activitySettingsManualField = $('manual-location-field');
-elements.activitySettingsManualLocation = $('input-manual-location');
-elements.activitySettingsStatus = $('activity-settings-status');
 elements.enterActivities = $('btn-enter-activities');
 elements.recommendationDock = $('ai-recommendation');
 elements.viewTabs = [...document.querySelectorAll('[data-view-target]')];
@@ -212,32 +200,6 @@ function saveActivitySettings(settings, userId = state.user?.id) {
     localStorage.setItem(ACTIVITY_SETTINGS_KEY, JSON.stringify(store));
 }
 
-function setActivitySettingsStatus(message = '', tone = '') {
-    if (!elements.activitySettingsStatus) return;
-    elements.activitySettingsStatus.textContent = message;
-    elements.activitySettingsStatus.dataset.tone = tone;
-}
-
-function updateManualLocationField(mode) {
-    const isManual = mode === 'manual';
-    elements.activitySettingsManualField?.classList.toggle('hidden', !isManual);
-    if (elements.activitySettingsManualLocation) elements.activitySettingsManualLocation.disabled = !isManual;
-}
-
-function updateActivitySettingsPanel() {
-    if (!elements.activitySettings) return;
-    const loggedIn = Boolean(state.user);
-    elements.activitySettings.classList.toggle('hidden', !loggedIn);
-    elements.activitySettings.setAttribute('aria-hidden', String(!loggedIn));
-    if (!loggedIn) return;
-    state.activitySettings = normalizeActivitySettings(state.activitySettings || getActivitySettings());
-    if (elements.activitySettingsDate) elements.activitySettingsDate.value = state.activitySettings.preferredDate;
-    const modeInput = document.querySelector(`input[name="activity-location-mode"][value="${state.activitySettings.locationMode}"]`);
-    if (modeInput) modeInput.checked = true;
-    if (elements.activitySettingsManualLocation) elements.activitySettingsManualLocation.value = state.activitySettings.manualLocation;
-    updateManualLocationField(state.activitySettings.locationMode);
-}
-
 const ACTIVITY_LOCATION_HINTS = [
     { terms: ['마포', '망원', '합정', '홍대', '월드컵'], latitude: 37.556, longitude: 126.91 },
     { terms: ['상암'], latitude: 37.578, longitude: 126.89 },
@@ -285,60 +247,6 @@ function sortGroupsForActivitySettings(groups) {
         if (distanceDifference) return distanceDifference;
         return leftTime - rightTime;
     });
-}
-
-function requestCurrentCoordinates() {
-    return new Promise((resolve) => {
-        if (!navigator.geolocation) return resolve(null);
-        let settled = false;
-        const finish = (value) => {
-            if (settled) return;
-            settled = true;
-            resolve(value);
-        };
-        const timeout = window.setTimeout(() => finish(null), 8_000);
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                window.clearTimeout(timeout);
-                finish({ latitude: position.coords.latitude, longitude: position.coords.longitude });
-            },
-            () => {
-                window.clearTimeout(timeout);
-                finish(null);
-            },
-            { enableHighAccuracy: false, maximumAge: 15 * 60 * 1000, timeout: 7_000 }
-        );
-    });
-}
-
-async function submitActivitySettings(event) {
-    event.preventDefault();
-    if (!state.user) return openLogin();
-    const preferredDate = elements.activitySettingsDate?.value;
-    if (!preferredDate) return setActivitySettingsStatus('참여를 생각하는 날짜를 선택해 주세요.', 'warning');
-    const locationMode = document.querySelector('input[name="activity-location-mode"]:checked')?.value === 'manual' ? 'manual' : 'current';
-    const manualLocation = elements.activitySettingsManualLocation?.value.trim() || '';
-    if (locationMode === 'manual' && !manualLocation) return setActivitySettingsStatus('동네나 가까운 역 이름을 입력해 주세요.', 'warning');
-    if (locationMode === 'manual' && /자택|우리\s*집|개인\s*주소|아파트|동호수/i.test(manualLocation)) return setActivitySettingsStatus('집 주소 대신 동네나 가까운 역 이름으로 설정해 주세요.', 'warning');
-    setActivitySettingsStatus(locationMode === 'current' ? '현재 위치를 확인하고 있어요…' : '설정을 저장하고 있어요…', 'info');
-    const coordinates = locationMode === 'current' ? await requestCurrentCoordinates() : locationHintCoordinates(manualLocation);
-    state.activitySettings = normalizeActivitySettings({ preferredDate, locationMode, manualLocation, coordinates });
-    saveActivitySettings(state.activitySettings);
-    updateActivitySettingsPanel();
-    renderGroups();
-    const message = locationMode === 'current' && !coordinates
-        ? '날짜와 현재 위치 설정을 저장했어요. 위치 권한을 허용하면 거리순이 더 정확해져요.'
-        : '설정했어요. 활동을 날짜와 가까운 거리 순서로 살펴볼 수 있어요.';
-    setActivitySettingsStatus(message, 'success');
-    setStatus(message, 'success');
-}
-
-function focusActivitySettings() {
-    if (!state.user) return;
-    state.activitySettings = getActivitySettings();
-    updateNav();
-    setView('home', false);
-    window.setTimeout(() => elements.activitySettingsDate?.focus(), 0);
 }
 
 function emptyActivityHistory() {
@@ -751,14 +659,6 @@ function seedGroups() {
     ];
 }
 
-function seedPosts() {
-    return [
-        { id: 'post-1', title: '처음 참여하는 분께 안내드려요', body: '공개 장소에서 만나고, 부담스러우면 언제든 참여를 취소할 수 있어요.', author: '운영팀', category: '안전 안내', createdAt: new Date().toISOString() },
-        { id: 'post-2', title: '이번 주 가볍게 읽을 책 추천받아요', body: '조용히 각자 읽고 마지막 10분만 감상을 나누는 모임을 준비하고 있어요.', author: '느긋한 독서러', category: '독서·스터디', createdAt: new Date(Date.now() - 36 * 60 * 60 * 1000).toISOString() },
-        { id: 'post-3', title: '동네 운동 모임은 어떤 게 좋을까요?', body: '러닝, 산책, 배드민턴처럼 처음 참여하기 쉬운 활동을 함께 찾아봐요.', author: '주말의 시작', category: '운동', createdAt: new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString() }
-    ];
-}
-
 const ACTIVITY_TYPES = [
     '공부·자기계발', '독서 모임', '영어 회화 모임', '일본어 스터디', '코딩 스터디', 'AI 활용 스터디',
     '자격증 준비 모임', '토론 모임', '논문 읽기 모임', '역사 탐방 및 세미나', '글쓰기 모임',
@@ -952,12 +852,6 @@ async function persistRemoteActivity(activity) {
         .eq('creator_id', activity.creatorId);
     if (publishError) throw publishError;
     activity.remote = true;
-}
-
-function loadPosts() {
-    const stored = safeJson(localStorage.getItem(POSTS_KEY), null);
-    state.posts = Array.isArray(stored) && stored.length ? stored : seedPosts();
-    localStorage.setItem(POSTS_KEY, JSON.stringify(state.posts));
 }
 
 function loadNotifications() {
@@ -1285,20 +1179,6 @@ function renderGroups() {
     renderHistory();
 }
 
-function renderBoard() {
-    if (!elements.boardList) return;
-    const query = normalizeSafetyText(state.filters.query);
-    const posts = state.posts.filter((post) => !query || normalizeSafetyText(`${post.title} ${post.body} ${post.category}`).includes(query));
-    elements.boardList.replaceChildren();
-    elements.boardEmpty.classList.toggle('hidden', posts.length > 0);
-    posts.forEach((post) => {
-        const card = document.createElement('article');
-        card.className = 'board-card';
-        card.append(createText('span', post.category, 'category-badge'), createText('h3', post.title), createText('p', post.body), createText('span', `${post.author} · ${formatDate(post.createdAt)}`, 'card-meta'));
-        elements.boardList.append(card);
-    });
-}
-
 function isActivityCompleted(group) {
     return group.status === 'completed' || new Date(group.scheduledAt).getTime() <= Date.now();
 }
@@ -1484,10 +1364,6 @@ function renderHistory() {
 function renderCategoryOptions() {
     const select = $('input-category');
     if (select) ACTIVITY_TYPES.forEach((type) => select.append(createText('option', type)));
-    if (elements.categoryList) {
-        elements.categoryList.replaceChildren();
-        ACTIVITY_TYPES.forEach((type) => elements.categoryList.append(createText('span', type, 'category-chip')));
-    }
     if (elements.activityExamples) {
         elements.activityExamples.replaceChildren();
         ACTIVITY_EXAMPLES.forEach((example) => {
@@ -1768,7 +1644,6 @@ function updateNav() {
         elements.trustScore.classList.remove('trust-hot', 'trust-warm', 'trust-cool');
         elements.trustScore.classList.add(trustScoreClass(state.user.trustScore));
     }
-    updateActivitySettingsPanel();
     renderNotifications();
 }
 
@@ -1890,8 +1765,9 @@ async function submitNicknameSetup(event) {
         elements.nicknameSetupForm.reset();
         state.filters.ageGroup = 'all';
         state.activitySettings = defaultActivitySettings();
-        focusActivitySettings();
-        setStatus('회원가입과 공개 닉네임 설정이 완료되었습니다. 오늘의 연결 설정부터 천천히 정해 보세요.', 'success');
+        updateNav();
+        setView('activities', false);
+        setStatus('회원가입과 공개 닉네임 설정이 완료되었습니다. 참여할 활동을 찾아보세요.', 'success');
     } catch (error) {
         console.error(error);
         setNicknameStatus('닉네임을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.', 'warning', 'input-signup-nickname');
@@ -2205,8 +2081,8 @@ async function login(event) {
             await loadRemoteMemberships();
             syncActivityHistory();
             state.activitySettings = getActivitySettings();
-            closeLogin(); focusActivitySettings();
-            setStatus('Supabase 로그인에 성공했습니다. 오늘의 연결 설정부터 천천히 정해 보세요.', 'success');
+            closeLogin(); updateNav(); setView('activities', false);
+            setStatus('Supabase 로그인에 성공했습니다. 참여할 활동을 찾아보세요.', 'success');
             return true;
         } catch (error) {
             // Supabase 연결 장애 때만 기존 브라우저 계정으로 제한적인 데모 fallback을 허용합니다.
@@ -2228,8 +2104,8 @@ async function login(event) {
     state.remoteJoinedGroupIds = null;
     state.activitySettings = getActivitySettings();
     syncActivityHistory();
-    closeLogin(); focusActivitySettings();
-    setStatus('닉네임으로 로그인되었습니다. 오늘의 연결 설정부터 천천히 정해 보세요.', 'success');
+    closeLogin(); updateNav(); setView('activities', false);
+    setStatus('닉네임으로 로그인되었습니다. 참여할 활동을 찾아보세요.', 'success');
 }
 
 async function logout() {
@@ -2534,12 +2410,12 @@ function cancelUnderfilledGroups() {
 
 function viewFromLocation() {
     const route = window.location.hash.replace(/^#\/?/, '');
-    return ['home', 'activities', 'board', 'history', 'guide'].includes(route) ? route : 'home';
+    return ['home', 'activities', 'history', 'guide'].includes(route) ? route : 'home';
 }
 
 function setView(view, shouldScroll = true, updateUrl = true) {
     const requestedRecommendation = view === 'recommendation';
-    const allowedViews = ['home', 'activities', 'board', 'history', 'guide'];
+    const allowedViews = ['home', 'activities', 'history', 'guide'];
     const nextView = allowedViews.includes(view) ? view : 'home';
     if (updateUrl) {
         const nextRoute = nextView === 'home' ? '#/' : `#/${nextView}`;
@@ -2572,7 +2448,6 @@ function closeCreate() { elements.createModal.classList.add('hidden'); elements.
 function applyGroupSearch() {
     state.filters.query = elements.search.value.trim();
     renderGroups();
-    renderBoard();
     setStatus(state.filters.query ? `'${state.filters.query}' 검색 결과를 업데이트했어요.` : '전체 활동을 다시 보여드려요.', 'success');
 }
 
@@ -2594,7 +2469,6 @@ function handleStaticButtonClick(button, event) {
         'btn-create': openCreate,
         'nav-create': openCreate,
         'btn-create-main': openCreate,
-        'btn-create-guide': openCreate,
         'btn-profile': openProfile,
         'btn-close-profile': closeProfile,
         'btn-logout': logout,
@@ -2629,7 +2503,7 @@ function init() {
         localStorage.setItem(USER_KEY, JSON.stringify(state.user));
     }
     state.filters.ageGroup = 'all';
-    persistence.load(); loadPosts(); loadNotifications(); renderCategoryOptions(); migrateCurrentUserAccount(state.user); syncActivityHistory(); updateNav(); renderGroups(); renderBoard(); cancelUnderfilledGroups(); setView(viewFromLocation(), false, false);
+    persistence.load(); loadNotifications(); renderCategoryOptions(); migrateCurrentUserAccount(state.user); syncActivityHistory(); updateNav(); renderGroups(); cancelUnderfilledGroups(); setView(viewFromLocation(), false, false);
     elements.profileForm.addEventListener('submit', submitProfile);
     $('signup-id').addEventListener('input', () => { signupState.idAvailable = false; signupState.idCheckedId = ''; $('signup-id').dataset.checkedId = ''; $('signup-id').dataset.idAvailable = 'false'; $('signup-id-status').textContent = '아이디가 변경되었습니다. 다시 중복 확인해 주세요.'; $('signup-id-status').dataset.tone = 'info'; });
     $('signup-password').addEventListener('input', validateSignupPassword);
@@ -2642,9 +2516,7 @@ function init() {
     elements.roomChatForm.addEventListener('submit', submitActivityRoomChat);
     elements.reportForm.addEventListener('submit', submitReport);
     elements.recommendationForm.addEventListener('submit', handleRecommendation);
-    elements.search.addEventListener('input', (event) => { state.filters.query = event.target.value; renderGroups(); renderBoard(); });
-    elements.activitySettingsForm.addEventListener('submit', submitActivitySettings);
-    document.querySelectorAll('input[name="activity-location-mode"]').forEach((input) => input.addEventListener('change', () => updateManualLocationField(input.value)));
+    elements.search.addEventListener('input', (event) => { state.filters.query = event.target.value; renderGroups(); });
     window.addEventListener('hashchange', () => setView(viewFromLocation(), true, false));
     window.addEventListener('popstate', () => setView(viewFromLocation(), true, false));
     window.addEventListener('storage', (event) => { if (event.key === GROUPS_KEY) { persistence.load(); renderGroups(); } if (event.key === NOTIFICATIONS_KEY) { loadNotifications(); renderNotifications(); } if (event.key === ACTIVITY_CHAT_KEY && elements.activityRoomModal.dataset.groupId) renderActivityRoomChat(elements.activityRoomModal.dataset.groupId); });
